@@ -1,19 +1,28 @@
 import React from 'react';
 import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { RELATIONSHIP_START_DATE, IMPORTANT_DATE } from '../constants/app';
-import { useElapsedTime } from '../hooks/useElapsedTime';
-import { pad2 } from '../utils/date';
 import { COLORS } from '../theme/colors';
+import { getElapsedTime, pad2 } from '../utils/date';
 
 const heartIcon = require('../../assets/images/corazon.png');
 const clockIcon = require('../../assets/images/reloj.png');
 
-export function HomeHeaderCard() {
+type Props = {
+  relationshipStartDate: string;
+};
+
+export function HomeHeaderCard({ relationshipStartDate }: Props) {
   const { width } = useWindowDimensions();
-  const elapsed = useElapsedTime(RELATIONSHIP_START_DATE);
+  const startDate = new Date(`${relationshipStartDate}T00:00:00`);
+  const elapsed = getElapsedTime(startDate);
 
   const iconSize = width * 0.25;
   const topSize = width * 0.3;
+
+  const day = startDate.getDate().toString();
+  const monthYear = startDate.toLocaleDateString('es-CL', {
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <View style={styles.card}>
@@ -26,11 +35,11 @@ export function HomeHeaderCard() {
           />
 
           <Text style={[styles.bigText, { fontSize: width * 0.06 }]}>
-            {IMPORTANT_DATE.day}
+            {day}
           </Text>
 
           <Text style={[styles.mediumText, { fontSize: width * 0.04 }]}>
-            {IMPORTANT_DATE.monthYear}
+            {monthYear}
           </Text>
         </View>
 
@@ -88,7 +97,7 @@ const styles = StyleSheet.create({
   },
   mediumText: {
     color: COLORS.text,
-    fontWeight: '400',
+    textTransform: 'capitalize',
   },
   elapsedMain: {
     color: COLORS.text,
@@ -96,12 +105,10 @@ const styles = StyleSheet.create({
   },
   elapsedSub: {
     color: COLORS.text,
-    fontWeight: '400',
     textAlign: 'center',
   },
   elapsedSmall: {
     color: COLORS.text,
-    fontWeight: '400',
     textAlign: 'center',
   },
 });
