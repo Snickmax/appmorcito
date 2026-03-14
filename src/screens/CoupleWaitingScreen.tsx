@@ -8,10 +8,15 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../providers/AuthProvider';
+import { RootStackParamList } from '../navigation/types';
+import HeaderIconButton from '../components/HeaderIconButton';
 
-export function CoupleWaitingScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'CoupleWaiting'>;
+
+export default function CoupleWaitingScreen({ navigation }: Props) {
   const { coupleState, refreshBootstrap, signOut } = useAuth();
   const [inviteCodeToJoin, setInviteCodeToJoin] = useState('');
   const [joinCoupleName, setJoinCoupleName] = useState('');
@@ -35,8 +40,37 @@ export function CoupleWaitingScreen() {
     await refreshBootstrap();
   };
 
+  const handleConfirmSignOut = () => {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Quieres cerrar sesión?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí, cerrar sesión',
+          style: 'destructive',
+          onPress: () => void signOut(),
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.topRow}>
+        <HeaderIconButton
+          icon="settings-outline"
+          label="Config."
+          onPress={() => navigation.navigate('CoupleSettings')}
+        />
+
+        <HeaderIconButton
+          icon="log-out-outline"
+          label="Salir"
+          onPress={handleConfirmSignOut}
+        />
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.title}>Esperando a tu pareja</Text>
         <Text style={styles.subtitle}>
@@ -50,13 +84,16 @@ export function CoupleWaitingScreen() {
 
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
-            Apodo: {coupleState?.couple_name || 'Sin apodo'}
+            Apodo de pareja: {coupleState?.couple_name || 'Sin apodo'}
           </Text>
           <Text style={styles.infoText}>
             Inicio relación: {coupleState?.relationship_start_date}
           </Text>
           <Text style={styles.infoText}>
             Miembros activos: {coupleState?.active_members_count}/2
+          </Text>
+          <Text style={styles.infoText}>
+            Rol: {coupleState?.my_role === 'owner' ? 'Owner' : 'Member'}
           </Text>
         </View>
 
@@ -82,10 +119,6 @@ export function CoupleWaitingScreen() {
         <Pressable style={styles.primaryButton} onPress={handleJoinOtherCouple}>
           <Text style={styles.primaryButtonText}>Usar este código</Text>
         </Pressable>
-
-        <Pressable style={styles.secondaryButton} onPress={signOut}>
-          <Text style={styles.secondaryButtonText}>Cerrar sesión</Text>
-        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -95,8 +128,16 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFD4E0',
-    justifyContent: 'center',
     padding: 20,
+    justifyContent: 'center',
+  },
+  topRow: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    flexDirection: 'row',
+    gap: 8,
+    zIndex: 2,
   },
   card: {
     backgroundColor: '#FFF0F4',
@@ -170,16 +211,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 16,
-  },
-  secondaryButton: {
-    marginTop: 10,
-    backgroundColor: '#FFE7EE',
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: '#9E4258',
-    fontWeight: '800',
   },
 });

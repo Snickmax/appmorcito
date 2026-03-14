@@ -10,8 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../providers/AuthProvider';
+import DateField from '../components/DateField';
 
-export function CoupleSetupScreen() {
+export default function CoupleSetupScreen() {
   const { refreshBootstrap, signOut } = useAuth();
 
   const [mode, setMode] = useState<'create' | 'join'>('create');
@@ -22,7 +23,7 @@ export function CoupleSetupScreen() {
 
   const handleCreate = async () => {
     if (!relationshipStartDate) {
-      Alert.alert('Falta fecha', 'Usa formato YYYY-MM-DD.');
+      Alert.alert('Falta fecha', 'Selecciona la fecha con el calendario.');
       return;
     }
 
@@ -56,6 +57,21 @@ export function CoupleSetupScreen() {
     }
 
     await refreshBootstrap();
+  };
+
+  const handleConfirmSignOut = () => {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Quieres cerrar sesión?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí, cerrar sesión',
+          style: 'destructive',
+          onPress: () => void signOut(),
+        },
+      ]
+    );
   };
 
   return (
@@ -95,12 +111,11 @@ export function CoupleSetupScreen() {
               style={styles.input}
               placeholderTextColor="#A66B79"
             />
-            <TextInput
-              placeholder="Fecha inicio relación (YYYY-MM-DD)"
+
+            <DateField
+              label="Fecha de inicio"
               value={relationshipStartDate}
-              onChangeText={setRelationshipStartDate}
-              style={styles.input}
-              placeholderTextColor="#A66B79"
+              onChange={setRelationshipStartDate}
             />
 
             <Pressable style={styles.primaryButton} onPress={handleCreate}>
@@ -132,7 +147,7 @@ export function CoupleSetupScreen() {
           </>
         )}
 
-        <Pressable style={styles.secondaryButton} onPress={signOut}>
+        <Pressable style={styles.secondaryButton} onPress={handleConfirmSignOut}>
           <Text style={styles.secondaryButtonText}>Cerrar sesión</Text>
         </Pressable>
       </View>

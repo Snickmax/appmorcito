@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -12,9 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeButton } from '../components/HomeButton';
 import { HomeHeaderCard } from '../components/HomeHeaderCard';
+import HeaderIconButton from '../components/HeaderIconButton';
 import { RootStackParamList } from '../navigation/types';
 import { COLORS } from '../theme/colors';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../providers/AuthProvider';
 
 const memoriceIcon = require('../../assets/images/Memorice.png');
@@ -24,59 +23,43 @@ const estadisticasIcon = require('../../assets/images/Estadisticas.png');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-type CoupleData = {
-  id: string;
-  relationship_start_date: string;
-  name: string | null;
-};
-
-export function HomeScreen({ navigation }: Props) {
+export default function HomeScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
-  const { coupleState, profile, signOut } = useAuth();
-  const activeCoupleId = coupleState?.couple_id ?? null;
-
-  const [couple, setCouple] = useState<CoupleData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { coupleState, coupleMembers, signOut } = useAuth();
 
   const iconSize = width * 0.25;
   const horizontalPadding = width * 0.08;
-
-  useEffect(() => {
-    const loadHome = async () => {
-      if (!activeCoupleId) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('couples')
-        .select('id, relationship_start_date, name')
-        .eq('id', activeCoupleId)
-        .single();
-
-      if (error) {
-        Alert.alert('Error', error.message);
-      } else {
-        setCouple(data);
-      }
-
-      setLoading(false);
-    };
-
-    loadHome();
-  }, [activeCoupleId]);
 
   const handleFutureAction = (sectionName: string) => {
     Alert.alert('Próximamente', `${sectionName} aún no está implementado.`);
   };
 
-  if (loading || !couple) {
+  const handleConfirmSignOut = () => {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Quieres cerrar sesión?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí, cerrar sesión',
+          style: 'destructive',
+          onPress: () => void signOut(),
+        },
+      ]
+    );
+  };
+
+  if (!coupleState) {
     return (
       <SafeAreaView style={styles.loadingSafeArea}>
-        <ActivityIndicator size="large" color="#C84B55" />
+        <Text style={styles.emptyText}>No hay una pareja activa cargada.</Text>
       </SafeAreaView>
     );
   }
+
+  const me = coupleMembers.find((member) => member.is_me);
+  const homeDisplayName =
+    me?.nickname?.trim() || me?.display_name?.trim() || 'mi amorcito';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -92,15 +75,26 @@ export function HomeScreen({ navigation }: Props) {
         ]}
       >
         <View style={styles.topRow}>
-          <Text style={styles.welcome}>
-            Hola{profile?.display_name ? `, ${profile.display_name}` : ''}
-          </Text>
-          <Text style={styles.signOut} onPress={signOut}>
-            Salir
-          </Text>
+          <Text style={styles.welcome}>Hola, {homeDisplayName}</Text>
+
+          <View style={styles.topActions}>
+            <HeaderIconButton
+              icon="settings-outline"
+              label="Config."
+              onPress={() => navigation.navigate('CoupleSettings')}
+            />
+
+            <HeaderIconButton
+              icon="log-out-outline"
+              label="Salir"
+              onPress={handleConfirmSignOut}
+            />
+          </View>
         </View>
 
-        <HomeHeaderCard relationshipStartDate={couple.relationship_start_date} />
+        <HomeHeaderCard
+          relationshipStartDate={coupleState.relationship_start_date}
+        />
 
         <View style={styles.buttonsContainer}>
           <HomeButton
@@ -126,9 +120,9 @@ export function HomeScreen({ navigation }: Props) {
 
           <HomeButton
             icon={estadisticasIcon}
-            label="Estadística"
+            label="Estadísticas"
             iconSize={iconSize}
-            onPress={() => handleFutureAction('Estadística')}
+            onPress={() => handleFutureAction('Estadísticas')}
           />
         </View>
       </ScrollView>
@@ -142,6 +136,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.homeBackground,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    color: '#7C3043',
+    fontWeight: '700',
+    textAlign: 'center',
   },
   safeArea: {
     flex: 1,
@@ -154,15 +154,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+  },
+  topActions: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
   },
   welcome: {
     fontSize: 20,
     fontWeight: '800',
     color: '#7C3043',
-  },
-  signOut: {
-    color: '#9E4258',
-    fontWeight: '800',
+    flex: 1,
   },
   buttonsContainer: {
     gap: 20,

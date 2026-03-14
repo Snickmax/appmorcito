@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../providers/AuthProvider';
 
-export function AuthScreen() {
+export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'signup'>('login');

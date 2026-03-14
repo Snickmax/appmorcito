@@ -34,7 +34,7 @@ const INITIAL_STATS: BestStatsMap = {
 
 const BOARD_OPTIONS: BoardSize[] = [2, 4, 6];
 
-export function MemoryGameScreen({ navigation }: Props) {
+export default function MemoryGameScreen({ navigation }: Props) {
   const { width, height } = useWindowDimensions();
   const {
     boardSize,

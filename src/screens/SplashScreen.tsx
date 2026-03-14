@@ -40,7 +40,7 @@ const SCENE = {
   },
 };
 
-export function SplashScreen({ navigation }: Props) {
+export default function SplashScreen({ navigation }: Props) {
   const { width, height } = useWindowDimensions();
 
   useEffect(() => {

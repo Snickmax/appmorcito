@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -18,11 +24,23 @@ type CoupleState = {
   my_role: 'owner' | 'member';
 } | null;
 
+export type ActiveCoupleMember = {
+  user_id: string;
+  display_name: string | null;
+  email: string | null;
+  avatar_path: string | null;
+  nickname: string | null;
+  role: 'owner' | 'member';
+  joined_at: string;
+  is_me: boolean;
+};
+
 type AuthContextType = {
   session: Session | null;
   loading: boolean;
   profile: Profile | null;
   coupleState: CoupleState;
+  coupleMembers: ActiveCoupleMember[];
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
@@ -36,17 +54,45 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function loadBootstrap(userId: string) {
-  const { data: profileData } = await supabase
+  const { data: profileData, error: profileError } = await supabase
     .from('profiles')
     .select('id, display_name, birth_date, avatar_path')
     .eq('id', userId)
     .single();
 
-  const { data: coupleData } = await supabase.rpc('get_my_couple_state');
+  if (profileError && profileError.code !== 'PGRST116') {
+    throw profileError;
+  }
+
+  const { data: coupleData, error: coupleError } = await supabase.rpc(
+    'get_my_couple_state'
+  );
+
+  if (coupleError) {
+    throw coupleError;
+  }
+
+  const normalizedCouple =
+    (Array.isArray(coupleData) ? coupleData[0] : coupleData) ?? null;
+
+  let coupleMembers: ActiveCoupleMember[] = [];
+
+  if (normalizedCouple?.couple_id) {
+    const { data: membersData, error: membersError } = await supabase.rpc(
+      'get_my_active_couple_members'
+    );
+
+    if (membersError) {
+      throw membersError;
+    }
+
+    coupleMembers = (membersData ?? []) as ActiveCoupleMember[];
+  }
 
   return {
     profile: (profileData as Profile | null) ?? null,
-    coupleState: (Array.isArray(coupleData) ? coupleData[0] : coupleData) ?? null,
+    coupleState: normalizedCouple as CoupleState,
+    coupleMembers,
   };
 }
 
@@ -54,72 +100,112 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [coupleState, setCoupleState] = useState<CoupleState>(null);
+  const [coupleMembers, setCoupleMembers] = useState<ActiveCoupleMember[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const clearBootstrap = () => {
+    setProfile(null);
+    setCoupleState(null);
+    setCoupleMembers([]);
+  };
 
   const refreshBootstrap = async () => {
     const user = session?.user;
+
     if (!user) {
-      setProfile(null);
-      setCoupleState(null);
+      clearBootstrap();
       return;
     }
 
-    const data = await loadBootstrap(user.id);
-    setProfile(data.profile);
-    setCoupleState(data.coupleState);
+    try {
+      const data = await loadBootstrap(user.id);
+      setProfile(data.profile);
+      setCoupleState(data.coupleState);
+      setCoupleMembers(data.coupleMembers);
+    } catch (error) {
+      console.error('refreshBootstrap error:', error);
+    }
   };
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
+    const bootstrap = async () => {
+      try {
+        const {
+          data: { session: initialSession },
+        } = await supabase.auth.getSession();
 
-      setSession(data.session ?? null);
+        if (!isMounted) return;
 
-      if (data.session?.user) {
-        const boot = await loadBootstrap(data.session.user.id);
-        if (!mounted) return;
-        setProfile(boot.profile);
-        setCoupleState(boot.coupleState);
+        setSession(initialSession ?? null);
+
+        if (initialSession?.user) {
+          const data = await loadBootstrap(initialSession.user.id);
+          if (!isMounted) return;
+          setProfile(data.profile);
+          setCoupleState(data.coupleState);
+          setCoupleMembers(data.coupleMembers);
+        } else {
+          clearBootstrap();
+        }
+      } catch (error) {
+        console.error('Initial auth bootstrap error:', error);
+        if (isMounted) {
+          clearBootstrap();
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
+    };
 
-      setLoading(false);
-    });
+    void bootstrap();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      setSession(nextSession ?? null);
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (_event, nextSession) => {
+        setSession(nextSession ?? null);
 
-      if (nextSession?.user) {
-        const boot = await loadBootstrap(nextSession.user.id);
-        setProfile(boot.profile);
-        setCoupleState(boot.coupleState);
-      } else {
-        setProfile(null);
-        setCoupleState(null);
+        if (!nextSession?.user) {
+          clearBootstrap();
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const data = await loadBootstrap(nextSession.user.id);
+          setProfile(data.profile);
+          setCoupleState(data.coupleState);
+          setCoupleMembers(data.coupleMembers);
+        } catch (error) {
+          console.error('onAuthStateChange bootstrap error:', error);
+          clearBootstrap();
+        } finally {
+          setLoading(false);
+        }
       }
-
-      setLoading(false);
-    });
+    );
 
     return () => {
-      mounted = false;
-      listener.subscription.unsubscribe();
+      isMounted = false;
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
   useEffect(() => {
-    if (!coupleState?.couple_id) return;
+    const userId = session?.user?.id;
+    if (!userId) return;
 
     const channel = supabase
-      .channel(`couple-members-${coupleState.couple_id}`)
+      .channel(`my-membership-${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'couple_members',
-          filter: `couple_id=eq.${coupleState.couple_id}`,
+          filter: `user_id=eq.${userId}`,
         },
         async () => {
           await refreshBootstrap();
@@ -128,9 +214,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [coupleState?.couple_id, session?.user?.id]);
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    const coupleId = coupleState?.couple_id;
+    if (!coupleId) return;
+
+    const channel = supabase
+      .channel(`couple-live-${coupleId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'couples',
+          filter: `id=eq.${coupleId}`,
+        },
+        async () => {
+          await refreshBootstrap();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'couple_members',
+          filter: `couple_id=eq.${coupleId}`,
+        },
+        async () => {
+          await refreshBootstrap();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [coupleState?.couple_id]);
 
   const value = useMemo<AuthContextType>(
     () => ({
@@ -138,6 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       profile,
       coupleState,
+      coupleMembers,
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -160,11 +284,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signOut: async () => {
-        await supabase.auth.signOut();
+        const { error } = await supabase.auth.signOut();
+
+        if (error) {
+          console.error('signOut error:', error);
+        }
       },
       refreshBootstrap,
     }),
-    [session, loading, profile, coupleState]
+    [session, loading, profile, coupleState, coupleMembers]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
