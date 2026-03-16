@@ -1,3 +1,11 @@
+export type CropQueueAsset = {
+  uri: string;
+  width: number;
+  height: number;
+  fileName?: string | null;
+  mimeType?: string | null;
+};
+
 export type RootStackParamList = {
   Auth: undefined;
   CoupleSetup: undefined;
@@ -5,5 +13,18 @@ export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   MemoryGame: undefined;
+  MemoryStats:
+    | {
+        selectedSetId?: string | null;
+      }
+    | undefined;
+  MemoryCropQueue: {
+    title: string;
+    memorySetId: string;
+    coupleId: string;
+    userId: string;
+    slotIndexes: number[];
+    assets: CropQueueAsset[];
+  };
   CoupleSettings: undefined;
 };

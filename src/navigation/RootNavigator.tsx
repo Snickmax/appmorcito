@@ -12,6 +12,8 @@ import CoupleWaitingScreen from '../screens/CoupleWaitingScreen';
 import SplashScreen from '../screens/SplashScreen';
 import HomeScreen from '../screens/HomeScreen';
 import MemoryGameScreen from '../screens/MemoryGameScreen';
+import MemoryStatsScreen from '../screens/MemoryStatsScreen';
+import MemoryCropQueueScreen from '../screens/MemoryCropQueueScreen';
 import CoupleSettingsScreen from '../screens/CoupleSettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -49,7 +51,10 @@ export default function RootNavigator() {
           </Stack.Group>
         ) : !hasCompleteCouple ? (
           <Stack.Group navigationKey={`waiting-${coupleState.couple_id}`}>
-            <Stack.Screen name="CoupleWaiting" component={CoupleWaitingScreen} />
+            <Stack.Screen
+              name="CoupleWaiting"
+              component={CoupleWaitingScreen}
+            />
             <Stack.Screen
               name="CoupleSettings"
               component={CoupleSettingsScreen}
@@ -60,6 +65,11 @@ export default function RootNavigator() {
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="MemoryGame" component={MemoryGameScreen} />
+            <Stack.Screen name="MemoryStats" component={MemoryStatsScreen} />
+            <Stack.Screen
+              name="MemoryCropQueue"
+              component={MemoryCropQueueScreen}
+            />
             <Stack.Screen
               name="CoupleSettings"
               component={CoupleSettingsScreen}

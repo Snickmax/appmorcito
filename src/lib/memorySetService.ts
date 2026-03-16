@@ -1,19 +1,35 @@
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from './supabase';
-import { MemoryImageSlot } from '../types/memory';
+import { MemoryImageSlot, MemorySetSummary } from '../types/memory';
 
 const BUCKET = 'couple-media';
+const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
+
 export const MAX_MEMORY_IMAGES = 18;
+export const MAX_MEMORY_SETS = 8;
 
 type MemorySetRow = {
   id: string;
+  title: string;
+  image_count: number;
+  session_count: number;
+  created_at: string;
 };
 
 type MemorySetImageRow = {
   id: string;
   sort_order: number;
   storage_path: string;
+};
+
+export type UploadableMemoryAsset = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  width?: number;
+  height?: number;
 };
 
 function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -30,7 +46,7 @@ function normalizeExtension(value: string | null | undefined) {
   return ext;
 }
 
-function getAssetExtension(asset: ImagePicker.ImagePickerAsset) {
+function getAssetExtension(asset: UploadableMemoryAsset) {
   if (asset.fileName?.includes('.')) {
     const fromFileName = asset.fileName.split('.').pop();
     return normalizeExtension(fromFileName);
@@ -49,7 +65,7 @@ function getAssetExtension(asset: ImagePicker.ImagePickerAsset) {
   return 'jpg';
 }
 
-function getAssetContentType(asset: ImagePicker.ImagePickerAsset) {
+function getAssetContentType(asset: UploadableMemoryAsset) {
   return asset.mimeType || 'image/jpeg';
 }
 
@@ -57,63 +73,155 @@ function buildStoragePath(
   coupleId: string,
   memorySetId: string,
   slotIndex: number,
-  asset: ImagePicker.ImagePickerAsset
+  asset: UploadableMemoryAsset
 ) {
   const ext = getAssetExtension(asset);
   return `${coupleId}/memory/${memorySetId}/${slotIndex}-${Date.now()}.${ext}`;
 }
 
-async function assetToArrayBuffer(asset: ImagePicker.ImagePickerAsset) {
+async function assetToArrayBuffer(asset: UploadableMemoryAsset) {
   const file = new File(asset.uri);
   const bytes = await file.bytes();
   return bytesToArrayBuffer(bytes);
 }
 
-export async function ensureMainMemorySet(
-  coupleId: string,
-  userId: string
-): Promise<string> {
-  const { data: existing, error: existingError } = await supabase
-    .from('memory_sets')
-    .select('id')
-    .eq('couple_id', coupleId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle<MemorySetRow>();
+function replaceFileExtension(fileName?: string | null, nextExt = 'jpg') {
+  if (!fileName) return `memory-${Date.now()}.${nextExt}`;
+  return fileName.replace(/\.[^.]+$/, `.${nextExt}`);
+}
 
-  if (existingError) {
-    throw existingError;
+export async function pickImagesBatch(count: number) {
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsMultipleSelection: true,
+    selectionLimit: count,
+    allowsEditing: false,
+    quality: 1,
+  });
+
+  if (result.canceled || !result.assets?.length) {
+    return [];
   }
 
-  if (existing?.id) {
-    return existing.id;
+  return result.assets.slice(0, count);
+}
+export async function cropAssetWithRect(
+  asset: UploadableMemoryAsset,
+  rect: {
+    originX: number;
+    originY: number;
+    width: number;
+    height: number;
+  }
+): Promise<UploadableMemoryAsset> {
+  const result = await ImageManipulator.manipulateAsync(
+    asset.uri,
+    [
+      {
+        crop: {
+          originX: Math.max(0, Math.round(rect.originX)),
+          originY: Math.max(0, Math.round(rect.originY)),
+          width: Math.max(1, Math.round(rect.width)),
+          height: Math.max(1, Math.round(rect.height)),
+        },
+      },
+    ],
+    {
+      compress: 1,
+      format: ImageManipulator.SaveFormat.JPEG,
+    }
+  );
+
+  return {
+    uri: result.uri,
+    width: result.width,
+    height: result.height,
+    mimeType: 'image/jpeg',
+    fileName: replaceFileExtension(asset.fileName, 'jpg'),
+  };
+}
+export async function getOrCreateMemorySets(): Promise<MemorySetSummary[]> {
+  const { data, error } = await supabase.rpc('get_my_couple_memory_sets');
+
+  if (error) {
+    throw error;
   }
 
-  const { data: created, error: createError } = await supabase
-    .from('memory_sets')
-    .insert({
-      couple_id: coupleId,
-      title: 'Set principal',
-      is_active: true,
-      created_by: userId,
-    })
-    .select('id')
-    .single<MemorySetRow>();
+  const rows = (data ?? []) as MemorySetRow[];
+
+  if (rows.length) {
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      imageCount: Number(row.image_count ?? 0),
+      sessionCount: Number(row.session_count ?? 0),
+      createdAt: row.created_at,
+    }));
+  }
+
+  const { error: createError } = await supabase.rpc('create_memory_set', {
+    p_title: null,
+  });
 
   if (createError) {
     throw createError;
   }
 
-  return created.id;
+  const { data: retryData, error: retryError } = await supabase.rpc(
+    'get_my_couple_memory_sets'
+  );
+
+  if (retryError) {
+    throw retryError;
+  }
+
+  return ((retryData ?? []) as MemorySetRow[]).map((row) => ({
+    id: row.id,
+    title: row.title,
+    imageCount: Number(row.image_count ?? 0),
+    sessionCount: Number(row.session_count ?? 0),
+    createdAt: row.created_at,
+  }));
 }
 
-export async function loadMemorySlots(
-  coupleId: string,
-  userId: string
-): Promise<{ memorySetId: string; slots: MemoryImageSlot[] }> {
-  const memorySetId = await ensureMainMemorySet(coupleId, userId);
+export async function createMemorySet(title?: string | null) {
+  const { data, error } = await supabase.rpc('create_memory_set', {
+    p_title: title ?? null,
+  });
 
+  if (error) {
+    throw error;
+  }
+
+  return data as string;
+}
+
+export async function renameMemorySet(memorySetId: string, title: string) {
+  const { data, error } = await supabase.rpc('rename_memory_set', {
+    p_memory_set_id: memorySetId,
+    p_title: title,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data as string;
+}
+
+export async function deleteMemorySet(memorySetId: string) {
+  const { data, error } = await supabase.rpc('delete_memory_set', {
+    p_memory_set_id: memorySetId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data as string;
+}
+
+export async function loadMemorySlots(memorySetId: string) {
   const { data, error } = await supabase
     .from('memory_set_images')
     .select('id, sort_order, storage_path')
@@ -125,14 +233,13 @@ export async function loadMemorySlots(
   }
 
   const rows = (data ?? []) as MemorySetImageRow[];
-
   const signedUrlMap = new Map<string, string>();
 
   await Promise.all(
     rows.map(async (row) => {
       const { data: signedData, error: signedError } = await supabase.storage
         .from(BUCKET)
-        .createSignedUrl(row.storage_path, 60 * 60);
+        .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
 
       if (!signedError && signedData?.signedUrl) {
         signedUrlMap.set(row.id, signedData.signedUrl);
@@ -167,7 +274,7 @@ export async function uploadAssetsIntoSlots(params: {
   userId: string;
   memorySetId: string;
   slotIndexes: number[];
-  assets: ImagePicker.ImagePickerAsset[];
+  assets: UploadableMemoryAsset[];
 }) {
   const { coupleId, userId, memorySetId, slotIndexes, assets } = params;
 
@@ -263,9 +370,7 @@ export async function deleteSlots(params: {
 
   const typedRows = (rows ?? []) as { id: string; storage_path: string }[];
 
-  const paths = typedRows
-    .map((row) => row.storage_path)
-    .filter(Boolean);
+  const paths = typedRows.map((row) => row.storage_path).filter(Boolean);
 
   if (paths.length) {
     const { error: removeError } = await supabase.storage

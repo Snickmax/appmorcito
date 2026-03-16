@@ -6,9 +6,10 @@ type Props = {
   card: MemoryCardModel;
   size: number;
   onPress: () => void;
+  onImageError?: () => void;
 };
 
-export function MemoryCard({ card, size, onPress }: Props) {
+export function MemoryCard({ card, size, onPress, onImageError }: Props) {
   const showFront = card.isFlipped || card.isMatched;
 
   return (
@@ -29,6 +30,7 @@ export function MemoryCard({ card, size, onPress }: Props) {
           source={{ uri: card.uri }}
           style={styles.image}
           resizeMode="cover"
+          onError={onImageError}
         />
       ) : (
         <View style={styles.backFace}>
