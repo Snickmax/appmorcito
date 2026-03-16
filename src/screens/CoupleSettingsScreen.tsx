@@ -59,6 +59,9 @@ export default function CoupleSettingsScreen({ navigation }: Props) {
     );
   }
 
+  const visibleRelationshipNickname =
+    coupleState.couple_name?.trim() || 'Sin apodo de relación';
+
   const handleSaveMyNickname = async () => {
     const { error } = await supabase.rpc('update_my_active_member_nickname', {
       p_nickname: myNickname || null,
@@ -198,6 +201,12 @@ export default function CoupleSettingsScreen({ navigation }: Props) {
 
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
+              Nombre de la relación: {visibleRelationshipNickname}
+            </Text>
+            <Text style={styles.infoText}>
+              Fecha de inicio: {coupleState.relationship_start_date}
+            </Text>
+            <Text style={styles.infoText}>
               Código actual: {coupleState.invite_code}
             </Text>
             <Text style={styles.infoText}>
@@ -208,7 +217,7 @@ export default function CoupleSettingsScreen({ navigation }: Props) {
           <Text style={styles.sectionTitle}>Participantes</Text>
           <CoupleMembersCard members={coupleMembers} />
 
-          <Text style={styles.sectionTitle}>Mi apodo</Text>
+          <Text style={styles.sectionTitle}>Mi apodo en la relación</Text>
           <TextInput
             value={myNickname}
             onChangeText={setMyNickname}
@@ -235,7 +244,7 @@ export default function CoupleSettingsScreen({ navigation }: Props) {
               />
 
               <DateField
-                label="Fecha de inicio"
+                label="Fecha de inicio de la relación"
                 value={relationshipStartDate}
                 onChange={setRelationshipStartDate}
               />

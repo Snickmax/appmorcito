@@ -4,8 +4,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -61,6 +61,9 @@ export default function HomeScreen({ navigation }: Props) {
   const homeDisplayName =
     me?.nickname?.trim() || me?.display_name?.trim() || 'mi amorcito';
 
+  const relationshipName =
+    coupleState.couple_name?.trim() || 'Sin apodo de relación';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
@@ -90,6 +93,11 @@ export default function HomeScreen({ navigation }: Props) {
               onPress={handleConfirmSignOut}
             />
           </View>
+        </View>
+
+        <View style={styles.relationshipCard}>
+          <Text style={styles.relationshipLabel}>Nombre de la relación</Text>
+          <Text style={styles.relationshipValue}>{relationshipName}</Text>
         </View>
 
         <HomeHeaderCard
@@ -166,6 +174,23 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#7C3043',
     flex: 1,
+  },
+  relationshipCard: {
+    backgroundColor: '#FFF0F4',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F3B9C7',
+  },
+  relationshipLabel: {
+    color: '#9E4258',
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  relationshipValue: {
+    color: '#7C3043',
+    fontWeight: '800',
+    fontSize: 20,
   },
   buttonsContainer: {
     gap: 20,

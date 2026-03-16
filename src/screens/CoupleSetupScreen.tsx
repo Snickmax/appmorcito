@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -13,13 +13,18 @@ import { useAuth } from '../providers/AuthProvider';
 import DateField from '../components/DateField';
 
 export default function CoupleSetupScreen() {
-  const { refreshBootstrap, signOut } = useAuth();
+  const { profile, refreshBootstrap, signOut } = useAuth();
 
   const [mode, setMode] = useState<'create' | 'join'>('create');
   const [relationshipStartDate, setRelationshipStartDate] = useState('');
-  const [coupleName, setCoupleName] = useState('');
+  const [memberNickname, setMemberNickname] = useState('');
   const [inviteCode, setInviteCode] = useState('');
-  const [joinCoupleName, setJoinCoupleName] = useState('');
+
+  useEffect(() => {
+    if (!memberNickname && profile?.display_name) {
+      setMemberNickname(profile.display_name);
+    }
+  }, [profile?.display_name, memberNickname]);
 
   const handleCreate = async () => {
     if (!relationshipStartDate) {
@@ -29,7 +34,8 @@ export default function CoupleSetupScreen() {
 
     const { error } = await supabase.rpc('create_couple', {
       p_relationship_start_date: relationshipStartDate,
-      p_name: coupleName || null,
+      p_name: null,
+      p_member_nickname: memberNickname || null,
     });
 
     if (error) {
@@ -48,7 +54,8 @@ export default function CoupleSetupScreen() {
 
     const { error } = await supabase.rpc('join_couple_by_invite', {
       p_invite_code: inviteCode.trim().toUpperCase(),
-      p_name: joinCoupleName || null,
+      p_name: null,
+      p_member_nickname: memberNickname || null,
     });
 
     if (error) {
@@ -102,18 +109,18 @@ export default function CoupleSetupScreen() {
           </Pressable>
         </View>
 
+        <TextInput
+          placeholder="Tu apodo en la relación"
+          value={memberNickname}
+          onChangeText={setMemberNickname}
+          style={styles.input}
+          placeholderTextColor="#A66B79"
+        />
+
         {mode === 'create' ? (
           <>
-            <TextInput
-              placeholder="Apodo de pareja (opcional)"
-              value={coupleName}
-              onChangeText={setCoupleName}
-              style={styles.input}
-              placeholderTextColor="#A66B79"
-            />
-
             <DateField
-              label="Fecha de inicio"
+              label="Fecha de inicio de la relación"
               value={relationshipStartDate}
               onChange={setRelationshipStartDate}
             />
@@ -129,14 +136,6 @@ export default function CoupleSetupScreen() {
               value={inviteCode}
               onChangeText={setInviteCode}
               autoCapitalize="characters"
-              style={styles.input}
-              placeholderTextColor="#A66B79"
-            />
-
-            <TextInput
-              placeholder="Apodo de pareja (opcional)"
-              value={joinCoupleName}
-              onChangeText={setJoinCoupleName}
               style={styles.input}
               placeholderTextColor="#A66B79"
             />

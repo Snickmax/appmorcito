@@ -3,6 +3,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Session } from '@supabase/supabase-js';
@@ -103,10 +104,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [coupleMembers, setCoupleMembers] = useState<ActiveCoupleMember[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const initializingRef = useRef(true);
+
   const clearBootstrap = () => {
     setProfile(null);
     setCoupleState(null);
     setCoupleMembers([]);
+  };
+
+  const applyBootstrapFromSession = async (nextSession: Session | null) => {
+    if (!nextSession?.user) {
+      setSession(null);
+      clearBootstrap();
+      return;
+    }
+
+    const data = await loadBootstrap(nextSession.user.id);
+    setSession(nextSession);
+    setProfile(data.profile);
+    setCoupleState(data.coupleState);
+    setCoupleMembers(data.coupleMembers);
   };
 
   const refreshBootstrap = async () => {
@@ -130,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    const bootstrap = async () => {
+    const initialize = async () => {
       try {
         const {
           data: { session: initialSession },
@@ -138,51 +155,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!isMounted) return;
 
-        setSession(initialSession ?? null);
-
-        if (initialSession?.user) {
-          const data = await loadBootstrap(initialSession.user.id);
-          if (!isMounted) return;
-          setProfile(data.profile);
-          setCoupleState(data.coupleState);
-          setCoupleMembers(data.coupleMembers);
-        } else {
-          clearBootstrap();
-        }
+        await applyBootstrapFromSession(initialSession ?? null);
       } catch (error) {
         console.error('Initial auth bootstrap error:', error);
         if (isMounted) {
+          setSession(null);
           clearBootstrap();
         }
       } finally {
         if (isMounted) {
+          initializingRef.current = false;
           setLoading(false);
         }
       }
     };
 
-    void bootstrap();
+    void initialize();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, nextSession) => {
-        setSession(nextSession ?? null);
-
-        if (!nextSession?.user) {
-          clearBootstrap();
-          setLoading(false);
+      async (event, nextSession) => {
+        if (event === 'INITIAL_SESSION' && initializingRef.current) {
           return;
         }
 
+        if (!isMounted) return;
+
+        setLoading(true);
+
         try {
-          const data = await loadBootstrap(nextSession.user.id);
-          setProfile(data.profile);
-          setCoupleState(data.coupleState);
-          setCoupleMembers(data.coupleMembers);
+          await applyBootstrapFromSession(nextSession ?? null);
         } catch (error) {
           console.error('onAuthStateChange bootstrap error:', error);
-          clearBootstrap();
+          if (isMounted) {
+            setSession(null);
+            clearBootstrap();
+          }
         } finally {
-          setLoading(false);
+          if (isMounted) {
+            setLoading(false);
+          }
         }
       }
     );
