@@ -19,3 +19,10 @@ export type BestStat = {
 } | null;
 
 export type BestStatsMap = Record<BoardSize, BestStat>;
+
+export type MemoryImageSlot = {
+  slotIndex: number;
+  imageId: string | null;
+  signedUrl: string | null;
+  storagePath: string | null;
+};
