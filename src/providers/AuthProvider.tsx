@@ -8,12 +8,14 @@ import React, {
 } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { VisualGender } from '../types/countdown';
 
 type Profile = {
   id: string;
   display_name: string | null;
   birth_date: string | null;
   avatar_path: string | null;
+  visual_gender: VisualGender;
 };
 
 type CoupleState = {
@@ -57,7 +59,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 async function loadBootstrap(userId: string) {
   const { data: profileData, error: profileError } = await supabase
     .from('profiles')
-    .select('id, display_name, birth_date, avatar_path')
+    .select('id, display_name, birth_date, avatar_path, visual_gender')
     .eq('id', userId)
     .single();
 

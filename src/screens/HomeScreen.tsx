@@ -123,7 +123,7 @@ export default function HomeScreen({ navigation }: Props) {
             icon={cuentaRegresivaIcon}
             label="Cuenta regresiva"
             iconSize={iconSize}
-            onPress={() => handleFutureAction('Cuenta regresiva')}
+            onPress={() => navigation.navigate('Countdown')}
           />
 
           <HomeButton

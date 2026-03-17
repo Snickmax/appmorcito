@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,11 +16,16 @@ import { useAuth } from '../providers/AuthProvider';
 import { supabase } from '../lib/supabase';
 import DateField from '../components/DateField';
 import CoupleMembersCard from '../components/CoupleMembersCard';
+import { updateMyProfileDetails } from '../lib/countdownService';
+import { VisualGender } from '../types/countdown';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CoupleSettings'>;
 
+const maleIcon = require('../../assets/images/men.png');
+const femaleIcon = require('../../assets/images/mujer.png');
+
 export default function CoupleSettingsScreen({ navigation }: Props) {
-  const { coupleState, coupleMembers, refreshBootstrap } = useAuth();
+  const { profile, coupleState, coupleMembers, refreshBootstrap } = useAuth();
 
   const isOwner = coupleState?.my_role === 'owner';
 
@@ -29,12 +35,20 @@ export default function CoupleSettingsScreen({ navigation }: Props) {
   );
 
   const [myNickname, setMyNickname] = useState('');
+  const [myBirthDate, setMyBirthDate] = useState('');
+  const [myVisualGender, setMyVisualGender] = useState<VisualGender>(null);
+
   const [relationshipNickname, setRelationshipNickname] = useState('');
   const [relationshipStartDate, setRelationshipStartDate] = useState('');
 
   useEffect(() => {
     setMyNickname(me?.nickname ?? '');
   }, [me?.nickname]);
+
+  useEffect(() => {
+    setMyBirthDate(profile?.birth_date ?? '');
+    setMyVisualGender(profile?.visual_gender ?? null);
+  }, [profile?.birth_date, profile?.visual_gender]);
 
   useEffect(() => {
     setRelationshipNickname(coupleState?.couple_name ?? '');
@@ -74,6 +88,27 @@ export default function CoupleSettingsScreen({ navigation }: Props) {
 
     await refreshBootstrap();
     Alert.alert('Listo', 'Tu apodo fue actualizado.');
+  };
+
+  const handleSaveMyProfile = async () => {
+    if (!profile?.id) {
+      Alert.alert('Error', 'No se pudo identificar tu perfil.');
+      return;
+    }
+
+    try {
+      await updateMyProfileDetails({
+        userId: profile.id,
+        birthDate: myBirthDate || null,
+        visualGender: myVisualGender,
+      });
+
+      await refreshBootstrap();
+      Alert.alert('Listo', 'Tu perfil fue actualizado.');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'No se pudo actualizar tu perfil.');
+    }
   };
 
   const handleSaveRelationshipSettings = async () => {
@@ -217,6 +252,62 @@ export default function CoupleSettingsScreen({ navigation }: Props) {
           <Text style={styles.sectionTitle}>Participantes</Text>
           <CoupleMembersCard members={coupleMembers} />
 
+          <Text style={styles.sectionTitle}>Mi perfil</Text>
+
+          <DateField
+            label="Mi cumpleaños"
+            value={myBirthDate}
+            onChange={setMyBirthDate}
+          />
+
+          <Text style={styles.label}>Mi icono visual</Text>
+
+          <View style={styles.genderRow}>
+            <Pressable
+              style={[
+                styles.genderOption,
+                myVisualGender === 'male' && styles.genderOptionSelected,
+              ]}
+              onPress={() => setMyVisualGender('male')}
+            >
+              <Image source={maleIcon} resizeMode="contain" style={styles.genderIcon} />
+              <Text
+                style={[
+                  styles.genderText,
+                  myVisualGender === 'male' && styles.genderTextSelected,
+                ]}
+              >
+                Hombre
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.genderOption,
+                myVisualGender === 'female' && styles.genderOptionSelected,
+              ]}
+              onPress={() => setMyVisualGender('female')}
+            >
+              <Image
+                source={femaleIcon}
+                resizeMode="contain"
+                style={styles.genderIcon}
+              />
+              <Text
+                style={[
+                  styles.genderText,
+                  myVisualGender === 'female' && styles.genderTextSelected,
+                ]}
+              >
+                Mujer
+              </Text>
+            </Pressable>
+          </View>
+
+          <Pressable style={styles.primaryButton} onPress={handleSaveMyProfile}>
+            <Text style={styles.primaryButtonText}>Guardar mi perfil</Text>
+          </Pressable>
+
           <Text style={styles.sectionTitle}>Mi apodo en la relación</Text>
           <TextInput
             value={myNickname}
@@ -355,6 +446,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     color: '#7C3043',
     marginBottom: 12,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 4,
+  },
+  genderOption: {
+    flex: 1,
+    backgroundColor: '#FFE7EE',
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F3B9C7',
+  },
+  genderOptionSelected: {
+    backgroundColor: '#C84B55',
+    borderColor: '#C84B55',
+  },
+  genderIcon: {
+    width: 46,
+    height: 46,
+    marginBottom: 8,
+  },
+  genderText: {
+    color: '#9E4258',
+    fontWeight: '800',
+  },
+  genderTextSelected: {
+    color: '#FFFFFF',
   },
   primaryButton: {
     marginTop: 6,

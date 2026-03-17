@@ -11,6 +11,7 @@ import CoupleSetupScreen from '../screens/CoupleSetupScreen';
 import CoupleWaitingScreen from '../screens/CoupleWaitingScreen';
 import SplashScreen from '../screens/SplashScreen';
 import HomeScreen from '../screens/HomeScreen';
+import CountdownScreen from '../screens/CountdownScreen';
 import MemoryGameScreen from '../screens/MemoryGameScreen';
 import MemoryStatsScreen from '../screens/MemoryStatsScreen';
 import MemoryCropQueueScreen from '../screens/MemoryCropQueueScreen';
@@ -64,6 +65,7 @@ export default function RootNavigator() {
           <Stack.Group navigationKey={`paired-${coupleState.couple_id}`}>
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Countdown" component={CountdownScreen} />
             <Stack.Screen name="MemoryGame" component={MemoryGameScreen} />
             <Stack.Screen name="MemoryStats" component={MemoryStatsScreen} />
             <Stack.Screen

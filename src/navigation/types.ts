@@ -12,6 +12,7 @@ export type RootStackParamList = {
   CoupleWaiting: undefined;
   Splash: undefined;
   Home: undefined;
+  Countdown: undefined;
   MemoryGame: undefined;
   MemoryStats:
     | {
