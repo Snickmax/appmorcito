@@ -414,7 +414,27 @@ export default function CountdownScreen({ navigation }: Props) {
           <Text style={styles.headerTitle}>Cuenta Regresiva</Text>
         </View>
 
-        {isLoadingMembers ? (
+        
+        <View style={styles.selectorBlock}>
+          <View style={styles.peopleRow}>
+            {members.map((member) => (
+              <CountdownPersonCard
+                key={member.user_id}
+                title={getDisplayName(member)}
+                icon={getMemberIcon(member)}
+                selected={selectedView === member.user_id}
+                onPress={() => handleSelectMember(member.user_id)}
+              />
+            ))}
+          </View>
+
+          <CountdownAnniversaryButton
+            icon={calendarIcon}
+            selected={selectedView === 'anniversary'}
+            onPress={handleSelectAnniversary}
+          />
+        </View>
+{isLoadingMembers ? (
           <View style={styles.mainCard}>
             <ActivityIndicator color="#B94E65" />
           </View>
@@ -461,27 +481,6 @@ export default function CountdownScreen({ navigation }: Props) {
             </Pressable>
           </View>
         )}
-
-        <View style={styles.selectorBlock}>
-          <View style={styles.peopleRow}>
-            {members.map((member) => (
-              <CountdownPersonCard
-                key={member.user_id}
-                title={getDisplayName(member)}
-                icon={getMemberIcon(member)}
-                selected={selectedView === member.user_id}
-                onPress={() => handleSelectMember(member.user_id)}
-              />
-            ))}
-          </View>
-
-          <CountdownAnniversaryButton
-            icon={calendarIcon}
-            selected={selectedView === 'anniversary'}
-            onPress={handleSelectAnniversary}
-          />
-        </View>
-
         <View style={styles.wishlistCard}>
           <View style={styles.wishlistHeaderRow}>
             <View style={styles.wishlistHeaderTextWrap}>
@@ -501,7 +500,7 @@ export default function CountdownScreen({ navigation }: Props) {
               <Text style={styles.addButtonText}>+ Agregar</Text>
             </Pressable>
           </View>
-
+          
           {selectedView === 'anniversary' && members.length > 1 && (
             <View style={styles.wishlistOwnerRow}>
               {members.map((member) => {
