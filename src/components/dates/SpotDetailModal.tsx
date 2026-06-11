@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { DateCategory, DateSpot } from '../../types/dates';
 import { formatDateLong } from '../../utils/countdown';
 
@@ -55,7 +56,7 @@ export default function SpotDetailModal({
             </Text>
 
             <Pressable style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>✕</Text>
+              <Ionicons name="close" size={18} color="#FFFFFF" />
             </Pressable>
           </View>
 
@@ -65,8 +66,13 @@ export default function SpotDetailModal({
               isRealizada ? styles.statusChipDone : styles.statusChipPending,
             ]}
           >
+            <Ionicons
+              name={isRealizada ? 'heart' : 'heart-outline'}
+              size={14}
+              color="#FFFFFF"
+            />
             <Text style={styles.statusChipText}>
-              {isRealizada ? '❤ Realizada' : '♡ Pendiente'}
+              {isRealizada ? 'Realizada' : 'Pendiente'}
             </Text>
           </View>
 
@@ -198,6 +204,9 @@ const styles = StyleSheet.create({
   },
   statusChip: {
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 6,

@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import DateField from '../DateField';
 import {
   CameraPermissionError,
@@ -107,7 +108,8 @@ export default function AddVisitModal({
                 onPress={() => void handleTakePhoto()}
                 disabled={submitting}
               >
-                <Text style={styles.photoOptionText}>📷 Tomar foto</Text>
+                <Ionicons name="camera" size={18} color="#9E4258" />
+                <Text style={styles.photoOptionText}>Tomar foto</Text>
               </Pressable>
 
               <Pressable
@@ -115,7 +117,8 @@ export default function AddVisitModal({
                 onPress={() => void handlePickPhoto()}
                 disabled={submitting}
               >
-                <Text style={styles.photoOptionText}>🖼 Galería</Text>
+                <Ionicons name="images" size={18} color="#9E4258" />
+                <Text style={styles.photoOptionText}>Galería</Text>
               </Pressable>
             </View>
           )}
@@ -180,6 +183,9 @@ const styles = StyleSheet.create({
   },
   photoOption: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: '#FFE7EE',
     borderRadius: 16,
     paddingVertical: 14,

@@ -20,6 +20,7 @@ const memoriceIcon = require('../../assets/images/Memorice.png');
 const citasIcon = require('../../assets/images/Citas.png');
 const cuentaRegresivaIcon = require('../../assets/images/CuentaRegresiva.png');
 const estadisticasIcon = require('../../assets/images/Estadisticas.png');
+const gastosIcon = require('../../assets/images/Gastos.png');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -29,10 +30,6 @@ export default function HomeScreen({ navigation }: Props) {
 
   const iconSize = width * 0.25;
   const horizontalPadding = width * 0.08;
-
-  const handleFutureAction = (sectionName: string) => {
-    Alert.alert('Próximamente', `${sectionName} aún no está implementado.`);
-  };
 
   const handleConfirmSignOut = () => {
     Alert.alert(
@@ -127,10 +124,17 @@ export default function HomeScreen({ navigation }: Props) {
           />
 
           <HomeButton
+            icon={gastosIcon}
+            label="Gastos"
+            iconSize={iconSize}
+            onPress={() => navigation.navigate('Expenses')}
+          />
+
+          <HomeButton
             icon={estadisticasIcon}
             label="Estadísticas"
             iconSize={iconSize}
-            onPress={() => handleFutureAction('Estadísticas')}
+            onPress={() => navigation.navigate('Stats')}
           />
         </View>
       </ScrollView>

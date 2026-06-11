@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { MemoryCardModel } from '../types/memory';
 
 type Props = {
@@ -34,7 +35,7 @@ export function MemoryCard({ card, size, onPress, onImageError }: Props) {
         />
       ) : (
         <View style={styles.backFace}>
-          <Text style={styles.backText}>❤</Text>
+          <Ionicons name="heart" size={26} color="#B94E65" />
         </View>
       )}
     </Pressable>
@@ -58,10 +59,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFD7E1',
-  },
-  backText: {
-    fontSize: 26,
-    color: '#B94E65',
-    fontWeight: '700',
   },
 });

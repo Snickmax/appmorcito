@@ -19,6 +19,8 @@ import CoupleSettingsScreen from '../screens/CoupleSettingsScreen';
 import DatesMapScreen from '../screens/DatesMapScreen';
 import DateGalleryScreen from '../screens/DateGalleryScreen';
 import DateSpotTimelineScreen from '../screens/DateSpotTimelineScreen';
+import ExpensesScreen from '../screens/ExpensesScreen';
+import StatsScreen from '../screens/StatsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -85,6 +87,8 @@ export default function RootNavigator() {
               name="DateSpotTimeline"
               component={DateSpotTimelineScreen}
             />
+            <Stack.Screen name="Expenses" component={ExpensesScreen} />
+            <Stack.Screen name="Stats" component={StatsScreen} />
           </Stack.Group>
         )}
       </Stack.Navigator>

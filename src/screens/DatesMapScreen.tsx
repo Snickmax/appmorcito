@@ -557,11 +557,9 @@ export default function DatesMapScreen({ navigation }: Props) {
               >
                 <Text style={styles.filterPillText}>
                   Filtro: {filterCategoryIds.length}{' '}
-                  {filterCategoryIds.length === 1
-                    ? 'categoría'
-                    : 'categorías'}{' '}
-                  ✕
+                  {filterCategoryIds.length === 1 ? 'categoría' : 'categorías'}
                 </Text>
+                <Ionicons name="close-circle" size={14} color="#FFFFFF" />
               </Pressable>
             )}
           </View>
@@ -784,6 +782,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: '#C84B55',
     borderRadius: 999,
     paddingHorizontal: 12,

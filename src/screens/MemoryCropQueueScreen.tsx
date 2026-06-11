@@ -11,6 +11,7 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import {
@@ -209,7 +210,8 @@ export default function MemoryCropQueueScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <Pressable style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Ionicons name="arrow-back" size={16} color="#7C3043" />
+          <Text style={styles.backButtonText}>Volver</Text>
         </Pressable>
 
         <Text style={styles.title}>{title}</Text>
@@ -310,6 +312,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     alignSelf: 'flex-start',
     marginBottom: 12,
     paddingHorizontal: 14,

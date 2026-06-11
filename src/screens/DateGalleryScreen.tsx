@@ -96,7 +96,7 @@ export default function DateGalleryScreen({ navigation }: Props) {
                 />
               ) : (
                 <View style={[styles.cover, styles.coverPlaceholder]}>
-                  <Text style={styles.coverPlaceholderText}>❤</Text>
+                  <Ionicons name="heart" size={40} color="#D96A7E" />
                 </View>
               )}
 
@@ -187,10 +187,6 @@ const styles = StyleSheet.create({
   coverPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  coverPlaceholderText: {
-    fontSize: 40,
-    color: '#D96A7E',
   },
   cardTitle: {
     color: '#7C3043',

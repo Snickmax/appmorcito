@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import DateField from '../DateField';
 import { DateCategory, DateSpot } from '../../types/dates';
 
@@ -114,7 +115,7 @@ export default function SpotFormModal({
               </Text>
 
               <Pressable style={styles.closeButton} onPress={onClose}>
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Ionicons name="close" size={18} color="#FFFFFF" />
               </Pressable>
             </View>
 

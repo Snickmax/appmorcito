@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { DateVisitWithUrl } from '../../types/dates';
 import { formatDateLong } from '../../utils/countdown';
 
@@ -29,7 +30,7 @@ export default function VisitTimelineItem({
           </Pressable>
         ) : (
           <View style={styles.noPhoto}>
-            <Text style={styles.noPhotoHeart}>❤</Text>
+            <Ionicons name="heart" size={26} color="#D96A7E" />
             <Text style={styles.noPhotoText}>Visita sin foto</Text>
           </View>
         )}
@@ -82,10 +83,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: '#FFE7EE',
     borderRadius: 14,
-  },
-  noPhotoHeart: {
-    fontSize: 26,
-    color: '#D96A7E',
   },
   noPhotoText: {
     color: '#9E4258',

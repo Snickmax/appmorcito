@@ -39,3 +39,5 @@ pnpm dlx supabase migration repair --status reverted <timestamp>
 | `20260611100000` | Fix: policy UPDATE en `date_visits` + backfill de fotos huérfanas | `rollbacks/20260611100000_fix_date_visits_update_policy_down.sql` |
 | `20260611100001` | Categorías de citas: `date_categories` + `date_spot_categories` (M:N) con RLS | `rollbacks/20260611100001_date_categories_down.sql` |
 | `20260611150000` | Auditoría de wishlist: `created_by`, `purchased_by`, `purchased_at` | `rollbacks/20260611150000_wishlist_audit_down.sql` |
+| `20260612100000` | Fix signos de saldados en `v_expense_balance_by_user` | `rollbacks/20260612100000_fix_expense_balance_view_down.sql` |
+| `20260612150000` | Eventos de gastos: `expense_events` + `expenses.event_id` | `rollbacks/20260612150000_expense_events_down.sql` |

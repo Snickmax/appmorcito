@@ -34,4 +34,6 @@ export type RootStackParamList = {
     spotId: string;
     title: string;
   };
+  Expenses: undefined;
+  Stats: undefined;
 };
