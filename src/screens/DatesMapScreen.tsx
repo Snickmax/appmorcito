@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -71,6 +71,15 @@ export default function DatesMapScreen({ navigation }: Props) {
 
   const mapRef = useRef<MapView | null>(null);
   const didFitRef = useRef(false);
+  const detailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (detailTimerRef.current) {
+        clearTimeout(detailTimerRef.current);
+      }
+    };
+  }, []);
 
   const [spots, setSpots] = useState<DateSpot[]>([]);
   const [categories, setCategories] = useState<DateCategory[]>([]);
@@ -407,7 +416,11 @@ export default function DatesMapScreen({ navigation }: Props) {
       700
     );
 
-    setTimeout(() => {
+    if (detailTimerRef.current) {
+      clearTimeout(detailTimerRef.current);
+    }
+
+    detailTimerRef.current = setTimeout(() => {
       setDetailSpotId(spot.id);
     }, 750);
   };

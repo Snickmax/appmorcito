@@ -97,6 +97,14 @@ export default function MemoryGameScreen({ navigation }: Props) {
 
   const winSavedRef = useRef(false);
   const refreshingRef = useRef(false);
+  // Ref para leer la selección actual sin meter selectedSetId en las deps de
+  // refreshCurrentSet (evita que cada cambio de set re-dispare el efecto de
+  // carga y provoque un fetch doble).
+  const selectedSetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedSetIdRef.current = selectedSetId;
+  }, [selectedSetId]);
 
   const requiredImages = requiredImagesForSize(selectedSize);
 
@@ -139,7 +147,9 @@ export default function MemoryGameScreen({ navigation }: Props) {
         [boardSize]: nextValue,
       };
 
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch((error) => {
+        console.warn('No se pudo guardar el récord local de Memorice', error);
+      });
       return next;
     });
   }, [isWon, boardSize, moves, elapsedSeconds]);
@@ -162,9 +172,10 @@ export default function MemoryGameScreen({ navigation }: Props) {
             ? preferredSetId
             : null;
 
+        const currentSetId = selectedSetIdRef.current;
         const currentValid =
-          selectedSetId && sets.some((setItem) => setItem.id === selectedSetId)
-            ? selectedSetId
+          currentSetId && sets.some((setItem) => setItem.id === currentSetId)
+            ? currentSetId
             : null;
 
         const nextSetId = validPreferred || currentValid || sets[0]?.id || null;
@@ -191,7 +202,7 @@ export default function MemoryGameScreen({ navigation }: Props) {
         refreshingRef.current = false;
       }
     },
-    [coupleState?.couple_id, session?.user?.id, selectedSetId]
+    [coupleState?.couple_id, session?.user?.id]
   );
 
   useEffect(() => {

@@ -38,6 +38,9 @@ export type WishlistItem = {
   currency: string;
   priority: WishlistPriority;
   status: WishlistStatus;
+  created_by: string | null;
+  purchased_by: string | null;
+  purchased_at: string | null;
   created_at: string;
   updated_at: string;
 };

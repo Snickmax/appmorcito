@@ -31,7 +31,7 @@ export async function fetchWishlistItems(params: {
   const { data, error } = await supabase
     .from('wishlist_items')
     .select(
-      'id, couple_id, owner_user_id, title, description, url, estimated_price, currency, priority, status, created_at, updated_at'
+      'id, couple_id, owner_user_id, title, description, url, estimated_price, currency, priority, status, created_by, purchased_by, purchased_at, created_at, updated_at'
     )
     .eq('couple_id', coupleId)
     .eq('owner_user_id', ownerUserId)
@@ -49,6 +49,8 @@ export async function fetchWishlistItems(params: {
 export async function createWishlistItem(params: {
   coupleId: string;
   ownerUserId: string;
+  // Quién registró el deseo (puede ser distinto del dueño de la lista).
+  createdBy: string;
   title: string;
   description?: string | null;
   url?: string | null;
@@ -59,6 +61,7 @@ export async function createWishlistItem(params: {
   const {
     coupleId,
     ownerUserId,
+    createdBy,
     title,
     description = null,
     url = null,
@@ -72,6 +75,7 @@ export async function createWishlistItem(params: {
     .insert({
       couple_id: coupleId,
       owner_user_id: ownerUserId,
+      created_by: createdBy,
       title,
       description,
       url,
@@ -81,7 +85,7 @@ export async function createWishlistItem(params: {
       status: 'active',
     })
     .select(
-      'id, couple_id, owner_user_id, title, description, url, estimated_price, currency, priority, status, created_at, updated_at'
+      'id, couple_id, owner_user_id, title, description, url, estimated_price, currency, priority, status, created_by, purchased_by, purchased_at, created_at, updated_at'
     )
     .single();
 
@@ -94,14 +98,24 @@ export async function createWishlistItem(params: {
 
 export async function updateWishlistItemStatus(
   itemId: string,
-  status: WishlistStatus
+  status: WishlistStatus,
+  userId: string
 ) {
+  // Auditoría para estadísticas: quién y cuándo lo compró. Al reabrir
+  // ('active') se limpia; archivar conserva el dato de compra.
+  const purchaseFields =
+    status === 'purchased'
+      ? { purchased_by: userId, purchased_at: new Date().toISOString() }
+      : status === 'active'
+      ? { purchased_by: null, purchased_at: null }
+      : {};
+
   const { data, error } = await supabase
     .from('wishlist_items')
-    .update({ status })
+    .update({ status, ...purchaseFields })
     .eq('id', itemId)
     .select(
-      'id, couple_id, owner_user_id, title, description, url, estimated_price, currency, priority, status, created_at, updated_at'
+      'id, couple_id, owner_user_id, title, description, url, estimated_price, currency, priority, status, created_by, purchased_by, purchased_at, created_at, updated_at'
     )
     .single();
 
@@ -112,8 +126,8 @@ export async function updateWishlistItemStatus(
   return data as WishlistItemRow;
 }
 
-export async function archiveWishlistItem(itemId: string) {
-  return updateWishlistItemStatus(itemId, 'archived');
+export async function archiveWishlistItem(itemId: string, userId: string) {
+  return updateWishlistItemStatus(itemId, 'archived', userId);
 }
 
 export async function updateMyProfileDetails(params: {

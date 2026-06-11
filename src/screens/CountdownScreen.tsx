@@ -84,7 +84,9 @@ function getMemberIcon(member: CountdownCoupleMember | null) {
 }
 
 export default function CountdownScreen({ navigation }: Props) {
-  const { coupleState, coupleMembers } = useAuth();
+  const { session, coupleState, coupleMembers } = useAuth();
+
+  const myUserId = session?.user?.id ?? null;
 
   const [members, setMembers] = useState<CountdownCoupleMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
@@ -224,7 +226,7 @@ export default function CountdownScreen({ navigation }: Props) {
   );
 
   useEffect(() => {
-    if (!coupleState?.couple_id) return;
+    if (!coupleState?.couple_id || !members.length) return;
 
     const memberIds = new Set(members.map((member) => member.user_id));
 
@@ -256,17 +258,12 @@ export default function CountdownScreen({ navigation }: Props) {
           event: '*',
           schema: 'public',
           table: 'profiles',
+          // Sin este filtro, cualquier cambio de perfil de TODA la base
+          // dispararía un refetch para cada cliente suscrito.
+          filter: `id=in.(${[...memberIds].join(',')})`,
         },
-        async (payload) => {
-          const changedProfileId = String(
-            (payload.new as { id?: string } | null)?.id ??
-              (payload.old as { id?: string } | null)?.id ??
-              ''
-          );
-
-          if (changedProfileId && memberIds.has(changedProfileId)) {
-            await loadMembers();
-          }
+        async () => {
+          await loadMembers();
         }
       )
       .subscribe();
@@ -314,7 +311,7 @@ export default function CountdownScreen({ navigation }: Props) {
   };
 
   const handleCreateWishlistItem = async () => {
-    if (!coupleState?.couple_id || !selectedWishlistOwner?.user_id) {
+    if (!coupleState?.couple_id || !selectedWishlistOwner?.user_id || !myUserId) {
       return;
     }
 
@@ -336,6 +333,7 @@ export default function CountdownScreen({ navigation }: Props) {
       await createWishlistItem({
         coupleId: coupleState.couple_id,
         ownerUserId: selectedWishlistOwner.user_id,
+        createdBy: myUserId,
         title: wishlistTitle.trim(),
         description: wishlistDescription.trim() || null,
         url: wishlistUrl.trim() || null,
@@ -359,15 +357,15 @@ export default function CountdownScreen({ navigation }: Props) {
     itemId: string,
     nextStatus: 'active' | 'purchased' | 'archived'
   ) => {
-    if (!selectedWishlistOwner?.user_id) return;
+    if (!selectedWishlistOwner?.user_id || !myUserId) return;
 
     try {
       setPendingWishlistItemId(itemId);
 
       if (nextStatus === 'archived') {
-        await archiveWishlistItem(itemId);
+        await archiveWishlistItem(itemId, myUserId);
       } else {
-        await updateWishlistItemStatus(itemId, nextStatus);
+        await updateWishlistItemStatus(itemId, nextStatus, myUserId);
       }
 
       await loadWishlist(selectedWishlistOwner.user_id);
@@ -434,7 +432,8 @@ export default function CountdownScreen({ navigation }: Props) {
             onPress={handleSelectAnniversary}
           />
         </View>
-{isLoadingMembers ? (
+
+        {isLoadingMembers ? (
           <View style={styles.mainCard}>
             <ActivityIndicator color="#B94E65" />
           </View>
