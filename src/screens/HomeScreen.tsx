@@ -116,7 +116,7 @@ export default function HomeScreen({ navigation }: Props) {
             icon={citasIcon}
             label="Citas"
             iconSize={iconSize}
-            onPress={() => handleFutureAction('Citas')}
+            onPress={() => navigation.navigate('DatesMap')}
           />
 
           <HomeButton

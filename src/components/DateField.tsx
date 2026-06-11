@@ -14,6 +14,7 @@ type Props = {
   label: string;
   value: string;
   onChange: (nextValue: string) => void;
+  maximumDate?: Date | null;
 };
 
 function parseDateFromYmd(value: string) {
@@ -47,7 +48,12 @@ function formatDateForUi(value: string) {
   });
 }
 
-export default function DateField({ label, value, onChange }: Props) {
+export default function DateField({
+  label,
+  value,
+  onChange,
+  maximumDate = new Date(),
+}: Props) {
   const [showPicker, setShowPicker] = useState(false);
 
   const currentDate = useMemo(() => parseDateFromYmd(value), [value]);
@@ -83,8 +89,9 @@ export default function DateField({ label, value, onChange }: Props) {
           value={currentDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          themeVariant="light"
           onChange={handleChange}
-          maximumDate={new Date()}
+          maximumDate={maximumDate ?? undefined}
         />
       )}
     </View>

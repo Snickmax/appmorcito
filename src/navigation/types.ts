@@ -28,4 +28,10 @@ export type RootStackParamList = {
     assets: CropQueueAsset[];
   };
   CoupleSettings: undefined;
+  DatesMap: undefined;
+  DateGallery: undefined;
+  DateSpotTimeline: {
+    spotId: string;
+    title: string;
+  };
 };

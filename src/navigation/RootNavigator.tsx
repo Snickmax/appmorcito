@@ -16,6 +16,9 @@ import MemoryGameScreen from '../screens/MemoryGameScreen';
 import MemoryStatsScreen from '../screens/MemoryStatsScreen';
 import MemoryCropQueueScreen from '../screens/MemoryCropQueueScreen';
 import CoupleSettingsScreen from '../screens/CoupleSettingsScreen';
+import DatesMapScreen from '../screens/DatesMapScreen';
+import DateGalleryScreen from '../screens/DateGalleryScreen';
+import DateSpotTimelineScreen from '../screens/DateSpotTimelineScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -75,6 +78,12 @@ export default function RootNavigator() {
             <Stack.Screen
               name="CoupleSettings"
               component={CoupleSettingsScreen}
+            />
+            <Stack.Screen name="DatesMap" component={DatesMapScreen} />
+            <Stack.Screen name="DateGallery" component={DateGalleryScreen} />
+            <Stack.Screen
+              name="DateSpotTimeline"
+              component={DateSpotTimelineScreen}
             />
           </Stack.Group>
         )}
