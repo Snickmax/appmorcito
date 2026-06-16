@@ -18,26 +18,19 @@ import {
   buildMockStats,
   CoupleStats,
   fetchCoupleStats,
-  StatsPeriod,
 } from '../lib/statsService';
 import { formatCLP } from '../lib/expensesService';
 import { fetchCategories } from '../lib/dateSpotsService';
 import { DateCategory } from '../types/dates';
 import StatBar from '../components/stats/StatBar';
 import DonutChart from '../components/stats/DonutChart';
-import LineChart from '../components/stats/LineChart';
+import MultiLineChart from '../components/stats/MultiLineChart';
+import DateRangeFilter, { DateRange } from '../components/DateRangeFilter';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Stats'>;
 
 const MEMBER_COLORS = ['#D96A7E', '#8E4FA8'];
 const EVENT_COLORS = ['#C84B55', '#8E4FA8', '#D96A7E', '#B07BC4', '#E89AAB', '#7C3043'];
-
-const PERIOD_OPTIONS: { value: StatsPeriod; label: string }[] = [
-  { value: 'all', label: 'Todo' },
-  { value: 'year', label: 'Año' },
-  { value: '3m', label: '3 meses' },
-  { value: 'month', label: 'Mes' },
-];
 
 function formatDuration(seconds: number) {
   const mins = Math.floor(seconds / 60);
@@ -68,7 +61,7 @@ export default function StatsScreen({ navigation }: Props) {
   const [realStats, setRealStats] = useState<CoupleStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
-  const [period, setPeriod] = useState<StatsPeriod>('all');
+  const [range, setRange] = useState<DateRange | null>(null);
   const [dateCategoryId, setDateCategoryId] = useState<string | null>(null);
   const [categories, setCategories] = useState<DateCategory[]>([]);
 
@@ -89,7 +82,7 @@ export default function StatsScreen({ navigation }: Props) {
     try {
       setIsLoading(true);
       const [data, categoryRows] = await Promise.all([
-        fetchCoupleStats(coupleState.couple_id, { period, dateCategoryId }),
+        fetchCoupleStats(coupleState.couple_id, { range, dateCategoryId }),
         fetchCategories(coupleState.couple_id),
       ]);
       setRealStats(data);
@@ -100,7 +93,7 @@ export default function StatsScreen({ navigation }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [coupleState?.couple_id, period, dateCategoryId]);
+  }, [coupleState?.couple_id, range, dateCategoryId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -166,18 +159,21 @@ export default function StatsScreen({ navigation }: Props) {
   }, [stats, coupleMembers, nameByUserId]);
 
   const periodLabel = useMemo(() => {
-    if (demoMode) return 'histórico';
-    switch (period) {
-      case 'month':
-        return 'este mes';
-      case '3m':
-        return '3 meses';
-      case 'year':
-        return 'este año';
-      default:
-        return 'histórico';
-    }
-  }, [demoMode, period]);
+    if (demoMode || !range) return 'histórico';
+    return 'rango';
+  }, [demoMode, range]);
+
+  const expenseLineSeries = useMemo(() => {
+    if (!stats) return [];
+    return coupleMembers.map((member, index) => ({
+      label: nameByUserId.get(member.user_id) ?? 'miembro',
+      color: MEMBER_COLORS[index % MEMBER_COLORS.length],
+      points: stats.expenses.monthLabels.map((label, idx) => ({
+        label,
+        value: stats.expenses.monthlyByUser.get(member.user_id)?.[idx] ?? 0,
+      })),
+    }));
+  }, [stats, coupleMembers, nameByUserId]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -212,29 +208,8 @@ export default function StatsScreen({ navigation }: Props) {
         </Pressable>
 
         {!demoMode && (
-          <View style={styles.periodRow}>
-            {PERIOD_OPTIONS.map((option) => {
-              const selected = period === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  style={[
-                    styles.periodChip,
-                    selected && styles.periodChipSelected,
-                  ]}
-                  onPress={() => setPeriod(option.value)}
-                >
-                  <Text
-                    style={[
-                      styles.periodChipText,
-                      selected && styles.periodChipTextSelected,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.rangeCard}>
+            <DateRangeFilter range={range} onChange={setRange} />
           </View>
         )}
 
@@ -288,13 +263,14 @@ export default function StatsScreen({ navigation }: Props) {
                     </>
                   )}
 
-                  <Text style={styles.sectionLabel}>
-                    Evolución mensual (últimos 6 meses)
-                  </Text>
-                  <LineChart
-                    data={stats.expenses.monthlySeries}
-                    formatValue={formatCLP}
-                  />
+                  {stats.expenses.monthLabels.length > 0 && (
+                    <>
+                      <Text style={styles.sectionLabel}>
+                        Gasto real por mes (cada uno)
+                      </Text>
+                      <MultiLineChart series={expenseLineSeries} />
+                    </>
+                  )}
 
                   <View style={styles.miniRow}>
                     <View style={styles.miniBox}>
@@ -566,27 +542,10 @@ const styles = StyleSheet.create({
   demoToggleTextOn: {
     color: '#FFFFFF',
   },
-  periodRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  periodChip: {
-    flex: 1,
+  rangeCard: {
     backgroundColor: '#FFF0F4',
-    borderRadius: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  periodChipSelected: {
-    backgroundColor: '#C84B55',
-  },
-  periodChipText: {
-    color: '#9E4258',
-    fontWeight: '900',
-    fontSize: 13,
-  },
-  periodChipTextSelected: {
-    color: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
   },
   categoryRow: {
     gap: 8,

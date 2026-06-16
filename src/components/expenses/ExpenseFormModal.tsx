@@ -25,7 +25,7 @@ export type ExpenseFormValues = {
   owedByUser: Map<string, number>;
 };
 
-type SplitMode = 'half' | 'percent' | 'fixed';
+type SplitMode = 'half' | 'percent' | 'fixed' | 'whole';
 
 type Props = {
   visible: boolean;
@@ -74,6 +74,8 @@ export default function ExpenseFormModal({
   const [splitMode, setSplitMode] = useState<SplitMode>('half');
   // Para percent/fixed: valor que asume el PRIMER miembro de la lista.
   const [splitValueText, setSplitValueText] = useState('');
+  // Para 'whole': quién asume el 100% del gasto.
+  const [wholeAssumerId, setWholeAssumerId] = useState<string | null>(null);
   const [eventId, setEventId] = useState<string | null>(null);
   const [newEventVisible, setNewEventVisible] = useState(false);
   const [newEventName, setNewEventName] = useState('');
@@ -99,14 +101,30 @@ export default function ExpenseFormModal({
       const shareA = initialExpense.shares.find(
         (share) => share.user_id === memberA?.user_id
       );
+      const shareB = initialExpense.shares.find(
+        (share) => share.user_id === memberB?.user_id
+      );
       const half = initialExpense.amount / 2;
+      const owedA = shareA?.owed_amount ?? 0;
+      const owedB = shareB?.owed_amount ?? 0;
 
-      if (shareA && Math.abs(shareA.owed_amount - half) < 1) {
+      setWholeAssumerId(null);
+
+      if (owedA < 1 && owedB >= 1) {
+        // Uno asume todo: lo asume el segundo miembro.
+        setSplitMode('whole');
+        setWholeAssumerId(memberB?.user_id ?? null);
+        setSplitValueText('');
+      } else if (owedB < 1 && owedA >= 1) {
+        setSplitMode('whole');
+        setWholeAssumerId(memberA?.user_id ?? null);
+        setSplitValueText('');
+      } else if (Math.abs(owedA - half) < 1) {
         setSplitMode('half');
         setSplitValueText('');
       } else {
         setSplitMode('fixed');
-        setSplitValueText(String(Math.round(shareA?.owed_amount ?? 0)));
+        setSplitValueText(String(Math.round(owedA)));
       }
     } else {
       setTitle('');
@@ -115,9 +133,10 @@ export default function ExpenseFormModal({
       setSpentAt(todayYmd());
       setSplitMode('half');
       setSplitValueText('');
+      setWholeAssumerId(null);
       setEventId(null);
     }
-  }, [visible, initialExpense, memberA?.user_id]);
+  }, [visible, initialExpense, memberA?.user_id, memberB?.user_id]);
 
   const handleCreateEvent = async () => {
     const name = newEventName.trim();
@@ -144,6 +163,12 @@ export default function ExpenseFormModal({
       return { a, b: amount - a };
     }
 
+    if (splitMode === 'whole') {
+      if (!wholeAssumerId) return null;
+      const aAssumes = wholeAssumerId === memberA.user_id;
+      return { a: aAssumes ? amount : 0, b: aAssumes ? 0 : amount };
+    }
+
     const value = parseAmount(splitValueText);
     if (value == null) return null;
 
@@ -156,7 +181,20 @@ export default function ExpenseFormModal({
     // fixed: el primer miembro asume `value`, el otro el resto.
     if (value > amount) return null;
     return { a: value, b: amount - value };
-  }, [amount, splitMode, splitValueText, memberA, memberB]);
+  }, [amount, splitMode, splitValueText, wholeAssumerId, memberA, memberB]);
+
+  // Aviso de deuda para el modo 'whole'.
+  const wholeHint = useMemo(() => {
+    if (splitMode !== 'whole' || !wholeAssumerId || !amount || !paidBy) {
+      return null;
+    }
+    if (wholeAssumerId === paidBy) {
+      return 'Invitación: nadie queda debiendo.';
+    }
+    const debtor =
+      wholeAssumerId === memberA?.user_id ? memberA : memberB;
+    return `${memberName(debtor)} queda debiendo ${formatCLP(amount)}.`;
+  }, [splitMode, wholeAssumerId, amount, paidBy, memberA, memberB]);
 
   const canSubmit =
     !!title.trim() && !!amount && amount > 0 && !!paidBy && !!split && !submitting;
@@ -252,6 +290,7 @@ export default function ExpenseFormModal({
                   ['half', 'Mitades'],
                   ['percent', 'Porcentaje'],
                   ['fixed', 'Montos'],
+                  ['whole', 'Uno asume todo'],
                 ] as [SplitMode, string][]
               ).map(([mode, label]) => {
                 const selected = splitMode === mode;
@@ -262,6 +301,9 @@ export default function ExpenseFormModal({
                     onPress={() => {
                       setSplitMode(mode);
                       setSplitValueText('');
+                      if (mode === 'whole') {
+                        setWholeAssumerId(paidBy ?? memberA?.user_id ?? null);
+                      }
                     }}
                   >
                     <Text
@@ -277,7 +319,7 @@ export default function ExpenseFormModal({
               })}
             </View>
 
-            {splitMode !== 'half' && (
+            {(splitMode === 'percent' || splitMode === 'fixed') && (
               <TextInput
                 style={styles.input}
                 placeholder={
@@ -292,12 +334,44 @@ export default function ExpenseFormModal({
               />
             )}
 
+            {splitMode === 'whole' && (
+              <>
+                <Text style={styles.subLabel}>¿Quién asume el total?</Text>
+                <View style={styles.chipsRow}>
+                  {members.map((member) => {
+                    const selected = wholeAssumerId === member.user_id;
+                    return (
+                      <Pressable
+                        key={member.user_id}
+                        style={[styles.chip, selected && styles.chipSelected]}
+                        onPress={() => setWholeAssumerId(member.user_id)}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            selected && styles.chipTextSelected,
+                          ]}
+                        >
+                          {memberName(member)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
             <View style={styles.previewBox}>
               {split ? (
-                <Text style={styles.previewText}>
-                  {memberName(memberA)} asume {formatCLP(split.a)} ·{' '}
-                  {memberName(memberB)} asume {formatCLP(split.b)}
-                </Text>
+                <>
+                  <Text style={styles.previewText}>
+                    {memberName(memberA)} asume {formatCLP(split.a)} ·{' '}
+                    {memberName(memberB)} asume {formatCLP(split.b)}
+                  </Text>
+                  {wholeHint && (
+                    <Text style={styles.previewHint}>{wholeHint}</Text>
+                  )}
+                </>
               ) : (
                 <Text style={styles.previewTextEmpty}>
                   Ingresa monto y división para ver el reparto.
@@ -451,6 +525,19 @@ const styles = StyleSheet.create({
     color: '#7C3043',
     fontWeight: '900',
     marginBottom: 8,
+  },
+  subLabel: {
+    color: '#9E4258',
+    fontWeight: '700',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  previewHint: {
+    color: '#C84B55',
+    fontWeight: '900',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 6,
   },
   chipsRow: {
     flexDirection: 'row',

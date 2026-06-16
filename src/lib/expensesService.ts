@@ -2,11 +2,10 @@ import { supabase } from './supabase';
 import {
   Expense,
   ExpenseAccumulated,
+  ExpenseAnalysis,
   ExpenseAverages,
   ExpenseBalance,
   ExpenseEvent,
-  ExpenseEventSummary,
-  ExpenseRangeSummary,
   ExpenseSettlement,
   ExpenseShare,
 } from '../types/expenses';
@@ -372,14 +371,6 @@ export async function deleteEvent(eventId: string) {
   }
 }
 
-type ExpenseLite = {
-  id: string;
-  spent_at: string;
-  amount: number;
-  paid_by_user_id: string;
-  title: string;
-};
-
 async function fetchSharesFor(expenseIds: string[]) {
   if (!expenseIds.length) {
     return [] as { expense_id: string; user_id: string; owed_amount: number }[];
@@ -449,22 +440,38 @@ export async function fetchExpenseAverages(
   };
 }
 
-export async function fetchRangeSummary(
-  coupleId: string,
-  fromYmd: string,
-  toYmd: string
-): Promise<ExpenseRangeSummary> {
+function ymdToBounds(fromYmd: string, toYmd: string) {
   const [fy, fm, fd] = fromYmd.split('-').map(Number);
   const [ty, tm, td] = toYmd.split('-').map(Number);
-  const fromIso = new Date(fy, fm - 1, fd, 0, 0, 0).toISOString();
-  const toIso = new Date(ty, tm - 1, td, 23, 59, 59).toISOString();
+  return {
+    fromIso: new Date(fy, fm - 1, fd, 0, 0, 0).toISOString(),
+    toIso: new Date(ty, tm - 1, td, 23, 59, 59).toISOString(),
+  };
+}
 
-  const { data, error } = await supabase
+// Análisis unificado de gastos por evento y/o rango de fechas: total,
+// consumido/pagado por persona y la serie mensual de consumo por usuario
+// (para el gráfico de dos líneas).
+export async function fetchExpenseAnalysis(params: {
+  coupleId: string;
+  eventId?: string | null;
+  fromYmd?: string | null;
+  toYmd?: string | null;
+}): Promise<ExpenseAnalysis> {
+  let query = supabase
     .from('expenses')
-    .select('id, amount, paid_by_user_id')
-    .eq('couple_id', coupleId)
-    .gte('spent_at', fromIso)
-    .lte('spent_at', toIso);
+    .select('id, amount, spent_at, paid_by_user_id')
+    .eq('couple_id', params.coupleId);
+
+  if (params.eventId) {
+    query = query.eq('event_id', params.eventId);
+  }
+  if (params.fromYmd && params.toYmd) {
+    const { fromIso, toIso } = ymdToBounds(params.fromYmd, params.toYmd);
+    query = query.gte('spent_at', fromIso).lte('spent_at', toIso);
+  }
+
+  const { data, error } = await query.order('spent_at', { ascending: true });
 
   if (error) {
     throw error;
@@ -473,30 +480,83 @@ export async function fetchRangeSummary(
   const rows = (data ?? []) as {
     id: string;
     amount: number;
+    spent_at: string;
     paid_by_user_id: string;
   }[];
 
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+
   const paidByUser = new Map<string, number>();
+  const monthKeyByExpense = new Map<string, string>();
+  const monthOrder: string[] = [];
+  const monthSeen = new Set<string>();
+  const monthLabelByKey = new Map<string, string>();
   let total = 0;
+  let eventMonth = 0;
+  let eventYear = 0;
+
   rows.forEach((row) => {
     const amount = Number(row.amount);
+    const date = new Date(row.spent_at);
+
     total += amount;
+    if (date >= monthStart) eventMonth += amount;
+    if (date >= yearStart) eventYear += amount;
+
     paidByUser.set(
       row.paid_by_user_id,
       (paidByUser.get(row.paid_by_user_id) ?? 0) + amount
     );
+
+    const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
+    monthKeyByExpense.set(row.id, key);
+    if (!monthSeen.has(key)) {
+      monthSeen.add(key);
+      monthOrder.push(key);
+      monthLabelByKey.set(
+        key,
+        `${MONTH_SHORT[date.getMonth()]} ${String(date.getFullYear()).slice(2)}`
+      );
+    }
   });
+
+  const months = monthOrder.slice(-12);
+  const monthIndex = new Map(months.map((key, i) => [key, i]));
+  const monthLabels = months.map((key) => monthLabelByKey.get(key) ?? key);
 
   const shares = await fetchSharesFor(rows.map((row) => row.id));
   const consumedByUser = new Map<string, number>();
+  const monthlyByUser = new Map<string, number[]>();
+
   shares.forEach((share) => {
+    const owed = Number(share.owed_amount);
+
     consumedByUser.set(
       share.user_id,
-      (consumedByUser.get(share.user_id) ?? 0) + Number(share.owed_amount)
+      (consumedByUser.get(share.user_id) ?? 0) + owed
     );
+
+    if (!monthlyByUser.has(share.user_id)) {
+      monthlyByUser.set(share.user_id, new Array(months.length).fill(0));
+    }
+    const key = monthKeyByExpense.get(share.expense_id);
+    const idx = key != null ? monthIndex.get(key) : undefined;
+    if (idx != null) {
+      monthlyByUser.get(share.user_id)![idx] += owed;
+    }
   });
 
-  return { total, count: rows.length, paidByUser, consumedByUser };
+  return {
+    total,
+    count: rows.length,
+    paidByUser,
+    consumedByUser,
+    monthLabels,
+    monthlyByUser,
+    eventTotals: params.eventId ? { month: eventMonth, year: eventYear } : null,
+  };
 }
 
 const MONTH_SHORT = [
@@ -513,68 +573,6 @@ const MONTH_SHORT = [
   'Nov',
   'Dic',
 ];
-
-export async function fetchEventSummary(
-  coupleId: string,
-  eventId: string
-): Promise<ExpenseEventSummary> {
-  const { data, error } = await supabase
-    .from('expenses')
-    .select('id, amount, spent_at, paid_by_user_id, title')
-    .eq('couple_id', coupleId)
-    .eq('event_id', eventId)
-    .order('spent_at', { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data ?? []) as ExpenseLite[];
-
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const yearStart = new Date(now.getFullYear(), 0, 1);
-
-  let total = 0;
-  let monthTotal = 0;
-  let yearTotal = 0;
-  const byMonth = new Map<string, { label: string; value: number }>();
-
-  rows.forEach((row) => {
-    const amount = Number(row.amount);
-    const date = new Date(row.spent_at);
-
-    total += amount;
-    if (date >= monthStart) monthTotal += amount;
-    if (date >= yearStart) yearTotal += amount;
-
-    const key = `${date.getFullYear()}-${date.getMonth()}`;
-    const label = `${MONTH_SHORT[date.getMonth()]} ${String(
-      date.getFullYear()
-    ).slice(2)}`;
-    const bucket = byMonth.get(key) ?? { label, value: 0 };
-    bucket.value += amount;
-    byMonth.set(key, bucket);
-  });
-
-  const shares = await fetchSharesFor(rows.map((row) => row.id));
-  const consumedByUser = new Map<string, number>();
-  shares.forEach((share) => {
-    consumedByUser.set(
-      share.user_id,
-      (consumedByUser.get(share.user_id) ?? 0) + Number(share.owed_amount)
-    );
-  });
-
-  return {
-    total,
-    count: rows.length,
-    monthTotal,
-    yearTotal,
-    consumedByUser,
-    monthlySeries: [...byMonth.values()].slice(-12),
-  };
-}
 
 export function formatCLP(value: number) {
   const rounded = Math.round(value);

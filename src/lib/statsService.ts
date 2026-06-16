@@ -8,16 +8,17 @@ export type MonthlyPoint = {
   value: number;
 };
 
-export type StatsPeriod = 'all' | 'year' | '3m' | 'month';
+export type DateRange = { fromYmd: string; toYmd: string };
 
 export type StatsFilters = {
-  period: StatsPeriod;
+  // null = TODO (sin filtro de fecha).
+  range: DateRange | null;
   // Filtra la sección de Citas por una categoría (como los pines del mapa).
   dateCategoryId: string | null;
 };
 
 export const DEFAULT_STATS_FILTERS: StatsFilters = {
-  period: 'all',
+  range: null,
   dateCategoryId: null,
 };
 
@@ -30,8 +31,9 @@ export type CoupleStats = {
     balanceByUser: PerUserCount;
     monthTotal: number;
     prevMonthTotal: number;
-    // Últimos 6 meses, del más antiguo al actual (independiente del periodo).
-    monthlySeries: MonthlyPoint[];
+    // Etiquetas de mes compartidas y consumo por usuario por mes (2 líneas).
+    monthLabels: string[];
+    monthlyByUser: Map<string, number[]>;
     // Reparto del gasto (del periodo) por evento.
     eventsSplit: MonthlyPoint[];
   };
@@ -67,19 +69,18 @@ function monthRangeOffset(offset: number) {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-function periodSinceIso(period: StatsPeriod): string | null {
-  const now = new Date();
+function rangeBounds(range: DateRange | null): {
+  since: string | null;
+  until: string | null;
+} {
+  if (!range) return { since: null, until: null };
 
-  switch (period) {
-    case 'month':
-      return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    case '3m':
-      return new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString();
-    case 'year':
-      return new Date(now.getFullYear(), 0, 1).toISOString();
-    default:
-      return null;
-  }
+  const [fy, fm, fd] = range.fromYmd.split('-').map(Number);
+  const [ty, tm, td] = range.toYmd.split('-').map(Number);
+  return {
+    since: new Date(fy, fm - 1, fd, 0, 0, 0).toISOString(),
+    until: new Date(ty, tm - 1, td, 23, 59, 59).toISOString(),
+  };
 }
 
 const MONTH_SHORT = [
@@ -97,42 +98,14 @@ const MONTH_SHORT = [
   'Dic',
 ];
 
-const SERIES_MONTHS = 6;
-
-function buildMonthlySeries(
-  rows: { spent_at: string; amount: number }[]
-): MonthlyPoint[] {
-  const now = new Date();
-  const buckets: { key: string; label: string; value: number }[] = [];
-
-  for (let offset = SERIES_MONTHS - 1; offset >= 0; offset -= 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    buckets.push({
-      key: `${date.getFullYear()}-${date.getMonth()}`,
-      label: MONTH_SHORT[date.getMonth()],
-      value: 0,
-    });
-  }
-
-  const byKey = new Map(buckets.map((bucket) => [bucket.key, bucket]));
-
-  rows.forEach((row) => {
-    const date = new Date(row.spent_at);
-    const bucket = byKey.get(`${date.getFullYear()}-${date.getMonth()}`);
-    if (bucket) bucket.value += Number(row.amount);
-  });
-
-  return buckets.map(({ label, value }) => ({ label, value }));
-}
 
 export async function fetchCoupleStats(
   coupleId: string,
   filters: StatsFilters = DEFAULT_STATS_FILTERS
 ): Promise<CoupleStats> {
-  const since = periodSinceIso(filters.period);
+  const { since, until } = rangeBounds(filters.range);
   const currentMonth = monthRangeOffset(0);
   const prevMonth = monthRangeOffset(-1);
-  const seriesStart = monthRangeOffset(-(SERIES_MONTHS - 1)).start;
 
   // Si hay filtro de categoría, primero se resuelven los spots de esa categoría.
   let categorySpotIds: string[] | null = null;
@@ -156,24 +129,26 @@ export async function fetchCoupleStats(
     .select('id, amount, spent_at, paid_by_user_id, event_id')
     .eq('couple_id', coupleId);
   if (since) periodExpensesQuery = periodExpensesQuery.gte('spent_at', since);
+  if (until) periodExpensesQuery = periodExpensesQuery.lte('spent_at', until);
 
   let visitsQuery = supabase
     .from('date_visits')
     .select('spot_id, created_by, photo_path, visited_at')
     .eq('couple_id', coupleId);
   if (since) visitsQuery = visitsQuery.gte('visited_at', since.slice(0, 10));
+  if (until) visitsQuery = visitsQuery.lte('visited_at', until.slice(0, 10));
 
   let sessionsQuery = supabase
     .from('memory_sessions')
     .select('user_id, moves, duration_seconds, completed_at')
     .eq('couple_id', coupleId);
   if (since) sessionsQuery = sessionsQuery.gte('completed_at', since);
+  if (until) sessionsQuery = sessionsQuery.lte('completed_at', until);
 
   const [
     balances,
     monthExpenses,
     prevMonthExpenses,
-    seriesExpenses,
     periodExpenses,
     eventsResult,
     spotsResult,
@@ -194,11 +169,6 @@ export async function fetchCoupleStats(
       .eq('couple_id', coupleId)
       .gte('spent_at', prevMonth.start)
       .lt('spent_at', prevMonth.end),
-    supabase
-      .from('expenses')
-      .select('spent_at, amount')
-      .eq('couple_id', coupleId)
-      .gte('spent_at', seriesStart),
     periodExpensesQuery,
     supabase
       .from('expense_events')
@@ -219,7 +189,6 @@ export async function fetchCoupleStats(
   for (const result of [
     monthExpenses,
     prevMonthExpenses,
-    seriesExpenses,
     periodExpenses,
     eventsResult,
     spotsResult,
@@ -235,14 +204,36 @@ export async function fetchCoupleStats(
   const sumAmounts = (rows: { amount: number }[] | null) =>
     (rows ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
 
-  // --- Gastos del periodo: consumo por persona y reparto por evento ---
+  // --- Gastos del periodo: consumo por persona, reparto por evento y serie
+  //     mensual de consumo por usuario (para el gráfico de dos líneas) ---
   const expenseRows = (periodExpenses.data ?? []) as {
     id: string;
     amount: number;
+    spent_at: string;
     event_id: string | null;
   }[];
 
+  // Meses presentes (orden cronológico, máx. 12) y mapa expense → mes.
+  const monthKeyByExpense = new Map<string, string>();
+  const monthOrder: string[] = [];
+  const monthSeen = new Set<string>();
+  const monthLabelByKey = new Map<string, string>();
+  expenseRows.forEach((row) => {
+    const date = new Date(row.spent_at);
+    const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
+    monthKeyByExpense.set(row.id, key);
+    if (!monthSeen.has(key)) {
+      monthSeen.add(key);
+      monthOrder.push(key);
+      monthLabelByKey.set(key, MONTH_SHORT[date.getMonth()]);
+    }
+  });
+  const months = monthOrder.slice(-12);
+  const monthIndex = new Map(months.map((key, i) => [key, i]));
+  const expenseMonthLabels = months.map((key) => monthLabelByKey.get(key) ?? key);
+
   const consumedByUser: PerUserCount = new Map();
+  const monthlyByUser = new Map<string, number[]>();
   if (expenseRows.length) {
     const { data: shareData, error: shareError } = await supabase
       .from('expense_shares')
@@ -257,9 +248,23 @@ export async function fetchCoupleStats(
     }
 
     (
-      (shareData ?? []) as { user_id: string; owed_amount: number }[]
+      (shareData ?? []) as {
+        expense_id: string;
+        user_id: string;
+        owed_amount: number;
+      }[]
     ).forEach((share) => {
-      increment(consumedByUser, share.user_id, Number(share.owed_amount));
+      const owed = Number(share.owed_amount);
+      increment(consumedByUser, share.user_id, owed);
+
+      if (!monthlyByUser.has(share.user_id)) {
+        monthlyByUser.set(share.user_id, new Array(months.length).fill(0));
+      }
+      const key = monthKeyByExpense.get(share.expense_id);
+      const idx = key != null ? monthIndex.get(key) : undefined;
+      if (idx != null) {
+        monthlyByUser.get(share.user_id)![idx] += owed;
+      }
     });
   }
 
@@ -380,9 +385,8 @@ export async function fetchCoupleStats(
       balanceByUser,
       monthTotal: sumAmounts(monthExpenses.data as { amount: number }[]),
       prevMonthTotal: sumAmounts(prevMonthExpenses.data as { amount: number }[]),
-      monthlySeries: buildMonthlySeries(
-        (seriesExpenses.data ?? []) as { spent_at: string; amount: number }[]
-      ),
+      monthLabels: expenseMonthLabels,
+      monthlyByUser,
       eventsSplit,
     },
     dates: {
@@ -413,15 +417,15 @@ export function buildMockStats(userIds: [string, string]): CoupleStats {
   const [a, b] = userIds;
   const now = new Date();
 
-  const monthlySeries: MonthlyPoint[] = [];
-  const mockTotals = [148000, 96500, 173200, 121800, 189400, 142300];
-  for (let offset = SERIES_MONTHS - 1; offset >= 0; offset -= 1) {
+  const monthLabels: string[] = [];
+  for (let offset = 5; offset >= 0; offset -= 1) {
     const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    monthlySeries.push({
-      label: MONTH_SHORT[date.getMonth()],
-      value: mockTotals[SERIES_MONTHS - 1 - offset],
-    });
+    monthLabels.push(MONTH_SHORT[date.getMonth()]);
   }
+  const monthlyByUser = new Map<string, number[]>([
+    [a, [62000, 41000, 88000, 53000, 96000, 49300]],
+    [b, [86000, 55500, 85200, 68800, 93400, 93000]],
+  ]);
 
   return {
     expenses: {
@@ -437,7 +441,8 @@ export function buildMockStats(userIds: [string, string]): CoupleStats {
       ]),
       monthTotal: 142300,
       prevMonthTotal: 189400,
-      monthlySeries,
+      monthLabels,
+      monthlyByUser,
       eventsSplit: [
         { label: 'Sin evento', value: 397200 },
         { label: 'Suscripciones', value: 186000 },

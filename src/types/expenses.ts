@@ -38,21 +38,17 @@ export type ExpenseAverages = {
   biggestThisMonth: { title: string; amount: number } | null;
 };
 
-export type ExpenseRangeSummary = {
+export type ExpenseAnalysis = {
   total: number;
   count: number;
   paidByUser: Map<string, number>;
   consumedByUser: Map<string, number>;
-};
-
-export type ExpenseEventSummary = {
-  total: number;
-  count: number;
-  monthTotal: number;
-  yearTotal: number;
-  consumedByUser: Map<string, number>;
-  // Meses con actividad del evento (máx. 12, del más antiguo al más nuevo).
-  monthlySeries: { label: string; value: number }[];
+  // Etiquetas de mes compartidas (orden cronológico, máx. 12).
+  monthLabels: string[];
+  // Consumido por usuario por mes, alineado a monthLabels (para 2 líneas).
+  monthlyByUser: Map<string, number[]>;
+  // Totales mes/año en curso; solo se rellenan al filtrar por un evento.
+  eventTotals: { month: number; year: number } | null;
 };
 
 export type ExpenseSettlement = {

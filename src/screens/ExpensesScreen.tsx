@@ -41,8 +41,7 @@ import ExpenseFormModal, {
   ExpenseFormValues,
 } from '../components/expenses/ExpenseFormModal';
 import SettleModal from '../components/expenses/SettleModal';
-import EventAnalysisCard from '../components/expenses/EventAnalysisCard';
-import RangeAnalysisCard from '../components/expenses/RangeAnalysisCard';
+import ExpenseAnalysisCard from '../components/expenses/ExpenseAnalysisCard';
 import ConfirmModal from '../components/ConfirmModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Expenses'>;
@@ -231,6 +230,16 @@ export default function ExpensesScreen({ navigation }: Props) {
 
   const splitBadge = (expense: Expense) => {
     if (expense.shares.length !== 2 || expense.amount <= 0) return 'división';
+
+    // Uno asume todo (una share en 0): invitación si la asumió quien pagó,
+    // adelanto si la asume el otro (queda debiendo).
+    const zeroShare = expense.shares.find((share) => share.owed_amount < 1);
+    if (zeroShare) {
+      const assumer = expense.shares.find((share) => share.owed_amount >= 1);
+      return assumer?.user_id === expense.paid_by_user_id
+        ? 'Invitación'
+        : 'Adelanto';
+    }
 
     const pctA = Math.round(
       (expense.shares[0].owed_amount / expense.amount) * 100
@@ -587,7 +596,7 @@ export default function ExpensesScreen({ navigation }: Props) {
         </View>
 
         {coupleId && (
-          <EventAnalysisCard
+          <ExpenseAnalysisCard
             coupleId={coupleId}
             events={events}
             members={coupleMembers}
@@ -600,10 +609,6 @@ export default function ExpensesScreen({ navigation }: Props) {
               })
             }
           />
-        )}
-
-        {coupleId && (
-          <RangeAnalysisCard coupleId={coupleId} members={coupleMembers} />
         )}
       </ScrollView>
 
