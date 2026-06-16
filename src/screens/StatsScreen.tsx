@@ -165,6 +165,20 @@ export default function StatsScreen({ navigation }: Props) {
     )} a ${nameByUserId.get(creditor.user_id)}`;
   }, [stats, coupleMembers, nameByUserId]);
 
+  const periodLabel = useMemo(() => {
+    if (demoMode) return 'histórico';
+    switch (period) {
+      case 'month':
+        return 'este mes';
+      case '3m':
+        return '3 meses';
+      case 'year':
+        return 'este año';
+      default:
+        return 'histórico';
+    }
+  }, [demoMode, period]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -197,6 +211,33 @@ export default function StatsScreen({ navigation }: Props) {
           </Text>
         </Pressable>
 
+        {!demoMode && (
+          <View style={styles.periodRow}>
+            {PERIOD_OPTIONS.map((option) => {
+              const selected = period === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  style={[
+                    styles.periodChip,
+                    selected && styles.periodChipSelected,
+                  ]}
+                  onPress={() => setPeriod(option.value)}
+                >
+                  <Text
+                    style={[
+                      styles.periodChipText,
+                      selected && styles.periodChipTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
         {isLoading && !demoMode ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color="#C84B55" />
@@ -227,9 +268,25 @@ export default function StatsScreen({ navigation }: Props) {
                   <DonutChart
                     segments={memberSegments(stats.expenses.consumedByUser)}
                     centerLabel={formatCLP(stats.expenses.total)}
-                    centerSub="histórico"
+                    centerSub={periodLabel}
                     formatValue={formatCLP}
                   />
+
+                  {stats.expenses.eventsSplit.length > 0 && (
+                    <>
+                      <Text style={styles.sectionLabel}>Gasto por evento</Text>
+                      <DonutChart
+                        segments={stats.expenses.eventsSplit.map(
+                          (entry, index) => ({
+                            label: entry.label,
+                            value: entry.value,
+                            color: EVENT_COLORS[index % EVENT_COLORS.length],
+                          })
+                        )}
+                        formatValue={formatCLP}
+                      />
+                    </>
+                  )}
 
                   <Text style={styles.sectionLabel}>
                     Evolución mensual (últimos 6 meses)
@@ -264,6 +321,57 @@ export default function StatsScreen({ navigation }: Props) {
             <View style={styles.card}>
               <SectionHeader icon="location" title="Citas" />
 
+              {!demoMode && categories.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryRow}
+                >
+                  <Pressable
+                    style={[
+                      styles.categoryChip,
+                      dateCategoryId === null && styles.categoryChipSelected,
+                    ]}
+                    onPress={() => setDateCategoryId(null)}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        dateCategoryId === null &&
+                          styles.categoryChipTextSelected,
+                      ]}
+                    >
+                      Todas
+                    </Text>
+                  </Pressable>
+
+                  {categories.map((category) => {
+                    const selected = dateCategoryId === category.id;
+                    return (
+                      <Pressable
+                        key={category.id}
+                        style={[
+                          styles.categoryChip,
+                          selected && styles.categoryChipSelected,
+                        ]}
+                        onPress={() =>
+                          setDateCategoryId(selected ? null : category.id)
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.categoryChipText,
+                            selected && styles.categoryChipTextSelected,
+                          ]}
+                        >
+                          {category.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
               {stats.dates.hasData ? (
                 <>
                   <Text style={styles.sectionLabel}>Estado de las citas</Text>
@@ -295,7 +403,9 @@ export default function StatsScreen({ navigation }: Props) {
                 </>
               ) : (
                 <Text style={styles.emptyText}>
-                  Aún no tienen citas en el mapa.
+                  {dateCategoryId
+                    ? 'No hay citas en esta categoría.'
+                    : 'Aún no tienen citas en el mapa.'}
                 </Text>
               )}
             </View>
@@ -454,6 +564,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   demoToggleTextOn: {
+    color: '#FFFFFF',
+  },
+  periodRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  periodChip: {
+    flex: 1,
+    backgroundColor: '#FFF0F4',
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  periodChipSelected: {
+    backgroundColor: '#C84B55',
+  },
+  periodChipText: {
+    color: '#9E4258',
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  periodChipTextSelected: {
+    color: '#FFFFFF',
+  },
+  categoryRow: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+  categoryChip: {
+    backgroundColor: '#FFE1E9',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  categoryChipSelected: {
+    backgroundColor: '#C84B55',
+  },
+  categoryChipText: {
+    color: '#9E4258',
+    fontWeight: '700',
+  },
+  categoryChipTextSelected: {
     color: '#FFFFFF',
   },
   card: {
