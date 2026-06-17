@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -165,6 +166,33 @@ function buildLeaderboard(
     });
 }
 
+const HistoryRow = React.memo(function HistoryRow({
+  row,
+}: {
+  row: MemorySessionHistoryRow;
+}) {
+  const label =
+    row.nickname?.trim() ||
+    row.display_name?.trim() ||
+    row.email?.trim() ||
+    'Sin nombre';
+
+  return (
+    <View style={styles.item}>
+      <Text style={styles.itemTitle}>
+        {label} · {row.board_size}x{row.board_size}
+      </Text>
+      <Text style={styles.itemMeta}>
+        {formatSeconds(row.duration_seconds)} · {row.moves} movimientos
+      </Text>
+      <Text style={styles.itemMeta}>Set: {row.set_title || 'Sin set'}</Text>
+      <Text style={styles.itemDate}>
+        {new Date(row.completed_at).toLocaleString('es-CL')}
+      </Text>
+    </View>
+  );
+});
+
 export default function MemoryStatsScreen({ navigation, route }: Props) {
   const { coupleState } = useAuth();
 
@@ -267,18 +295,17 @@ export default function MemoryStatsScreen({ navigation, route }: Props) {
     [history]
   );
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={16} color="#7C3043" />
-          <Text style={styles.backButtonText}>Volver</Text>
-        </Pressable>
+  const listHeader = (
+    <View style={styles.headerStack}>
+      <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Ionicons name="arrow-back" size={16} color="#7C3043" />
+        <Text style={styles.backButtonText}>Volver</Text>
+      </Pressable>
 
-        <Text style={styles.title}>Scoreboard</Text>
-        <Text style={styles.subtitle}>Ranking global, mejores runs e historial</Text>
+      <Text style={styles.title}>Scoreboard</Text>
+      <Text style={styles.subtitle}>Ranking global, mejores runs e historial</Text>
 
-        <View style={styles.card}>
+      <View style={styles.card}>
           <Text style={styles.sectionTitle}>Filtro por tablero</Text>
           <View style={styles.filterRow}>
             {BOARD_OPTIONS.map((size) => {
@@ -429,43 +456,29 @@ export default function MemoryStatsScreen({ navigation, route }: Props) {
           )}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Historial</Text>
+      <Text style={styles.sectionTitle}>Historial</Text>
+    </View>
+  );
 
-          {isLoading ? (
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <FlatList
+        data={history}
+        keyExtractor={(row) => row.session_id}
+        renderItem={({ item }) => <HistoryRow row={item} />}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          isLoading ? (
             <ActivityIndicator color="#B94E65" />
-          ) : history.length ? (
-            <View style={styles.list}>
-              {history.map((row) => {
-                const label =
-                  row.nickname?.trim() ||
-                  row.display_name?.trim() ||
-                  row.email?.trim() ||
-                  'Sin nombre';
-
-                return (
-                  <View key={row.session_id} style={styles.item}>
-                    <Text style={styles.itemTitle}>
-                      {label} · {row.board_size}x{row.board_size}
-                    </Text>
-                    <Text style={styles.itemMeta}>
-                      {formatSeconds(row.duration_seconds)} · {row.moves} movimientos
-                    </Text>
-                    <Text style={styles.itemMeta}>
-                      Set: {row.set_title || 'Sin set'}
-                    </Text>
-                    <Text style={styles.itemDate}>
-                      {new Date(row.completed_at).toLocaleString('es-CL')}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
           ) : (
             <Text style={styles.emptyText}>No hay historial aún.</Text>
-          )}
-        </View>
-      </ScrollView>
+          )
+        }
+        contentContainerStyle={styles.scrollContent}
+        initialNumToRender={12}
+        windowSize={11}
+        removeClippedSubviews
+      />
     </SafeAreaView>
   );
 }
@@ -473,6 +486,7 @@ export default function MemoryStatsScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFD4E0' },
   scrollContent: { padding: 20, paddingBottom: 40, gap: 16 },
+  headerStack: { gap: 16 },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',

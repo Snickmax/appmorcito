@@ -34,6 +34,7 @@ import {
   CountdownSelection,
   WishlistItem,
   WishlistPriority,
+  WishlistStatus,
 } from '../types/countdown';
 import {
   formatDateLong,
@@ -354,29 +355,30 @@ export default function CountdownScreen({ navigation }: Props) {
     }
   };
 
-  const handleChangeWishlistStatus = async (
-    itemId: string,
-    nextStatus: 'active' | 'purchased' | 'archived'
-  ) => {
-    if (!selectedWishlistOwner?.user_id || !myUserId) return;
+  const handleChangeWishlistStatus = useCallback(
+    async (itemId: string, nextStatus: WishlistStatus) => {
+      const ownerUserId = selectedWishlistOwner?.user_id;
+      if (!ownerUserId || !myUserId) return;
 
-    try {
-      setPendingWishlistItemId(itemId);
+      try {
+        setPendingWishlistItemId(itemId);
 
-      if (nextStatus === 'archived') {
-        await archiveWishlistItem(itemId, myUserId);
-      } else {
-        await updateWishlistItemStatus(itemId, nextStatus, myUserId);
+        if (nextStatus === 'archived') {
+          await archiveWishlistItem(itemId, myUserId);
+        } else {
+          await updateWishlistItemStatus(itemId, nextStatus, myUserId);
+        }
+
+        await loadWishlist(ownerUserId);
+      } catch (error) {
+        console.error(error);
+        Alert.alert('Error', 'No se pudo actualizar el regalo.');
+      } finally {
+        setPendingWishlistItemId(null);
       }
-
-      await loadWishlist(selectedWishlistOwner.user_id);
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'No se pudo actualizar el regalo.');
-    } finally {
-      setPendingWishlistItemId(null);
-    }
-  };
+    },
+    [selectedWishlistOwner?.user_id, myUserId, loadWishlist]
+  );
 
   const handleSelectAnniversary = () => {
     setSelectedView('anniversary');
@@ -554,15 +556,7 @@ export default function CountdownScreen({ navigation }: Props) {
                   key={item.id}
                   item={item}
                   disabled={pendingWishlistItemId === item.id}
-                  onMarkPurchased={() =>
-                    void handleChangeWishlistStatus(item.id, 'purchased')
-                  }
-                  onReopen={() =>
-                    void handleChangeWishlistStatus(item.id, 'active')
-                  }
-                  onArchive={() =>
-                    void handleChangeWishlistStatus(item.id, 'archived')
-                  }
+                  onChangeStatus={handleChangeWishlistStatus}
                 />
               ))}
             </View>
@@ -593,15 +587,7 @@ export default function CountdownScreen({ navigation }: Props) {
                   key={item.id}
                   item={item}
                   disabled={pendingWishlistItemId === item.id}
-                  onMarkPurchased={() =>
-                    void handleChangeWishlistStatus(item.id, 'purchased')
-                  }
-                  onReopen={() =>
-                    void handleChangeWishlistStatus(item.id, 'active')
-                  }
-                  onArchive={() =>
-                    void handleChangeWishlistStatus(item.id, 'archived')
-                  }
+                  onChangeStatus={handleChangeWishlistStatus}
                 />
               ))}
             </View>

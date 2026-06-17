@@ -75,6 +75,108 @@ function formatDayMonth(iso: string) {
   return date.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
 }
 
+function splitBadge(expense: Expense) {
+  if (expense.shares.length !== 2 || expense.amount <= 0) return 'división';
+
+  // Uno asume todo (una share en 0): invitación si la asumió quien pagó,
+  // adelanto si la asume el otro (queda debiendo).
+  const zeroShare = expense.shares.find((share) => share.owed_amount < 1);
+  if (zeroShare) {
+    const assumer = expense.shares.find((share) => share.owed_amount >= 1);
+    return assumer?.user_id === expense.paid_by_user_id
+      ? 'Invitación'
+      : 'Adelanto';
+  }
+
+  const pctA = Math.round((expense.shares[0].owed_amount / expense.amount) * 100);
+
+  if (pctA === 50) return '50/50';
+  return `${pctA}/${100 - pctA}`;
+}
+
+type DeleteTarget = {
+  kind: 'expense' | 'settlement';
+  id: string;
+  label: string;
+};
+
+const LedgerRow = React.memo(function LedgerRow({
+  item,
+  nameByUserId,
+  eventNameById,
+  onEditExpense,
+  onRequestDelete,
+}: {
+  item: ListItem;
+  nameByUserId: Map<string, string>;
+  eventNameById: Map<string, string>;
+  onEditExpense: (expense: Expense) => void;
+  onRequestDelete: (target: DeleteTarget) => void;
+}) {
+  if (item.type === 'expense') {
+    const { expense } = item;
+
+    return (
+      <Pressable
+        style={styles.expenseRow}
+        onPress={() => onEditExpense(expense)}
+        onLongPress={() =>
+          onRequestDelete({
+            kind: 'expense',
+            id: expense.id,
+            label: expense.title,
+          })
+        }
+      >
+        <View style={styles.expenseTextWrap}>
+          <Text style={styles.expenseTitle} numberOfLines={1}>
+            {expense.title}
+          </Text>
+          <Text style={styles.expenseSubtitle}>
+            {formatDayMonth(expense.spent_at)} · pagó{' '}
+            {nameByUserId.get(expense.paid_by_user_id)} · {splitBadge(expense)}
+            {expense.event_id
+              ? ` · ${eventNameById.get(expense.event_id) ?? 'evento'}`
+              : ''}
+          </Text>
+        </View>
+
+        <Text style={styles.expenseAmount}>{formatCLP(expense.amount)}</Text>
+      </Pressable>
+    );
+  }
+
+  const { settlement } = item;
+
+  return (
+    <Pressable
+      style={[styles.expenseRow, styles.settlementRow]}
+      onLongPress={() =>
+        onRequestDelete({
+          kind: 'settlement',
+          id: settlement.id,
+          label: `saldado de ${formatCLP(settlement.amount)}`,
+        })
+      }
+    >
+      <Ionicons name="swap-horizontal" size={18} color="#2E7D32" />
+
+      <View style={styles.expenseTextWrap}>
+        <Text style={styles.settlementTitle}>
+          Saldado: {nameByUserId.get(settlement.from_user_id)} le pagó a{' '}
+          {nameByUserId.get(settlement.to_user_id)}
+        </Text>
+        <Text style={styles.expenseSubtitle}>
+          {formatDayMonth(settlement.settled_at)}
+          {settlement.note ? ` · ${settlement.note}` : ''}
+        </Text>
+      </View>
+
+      <Text style={styles.settlementAmount}>{formatCLP(settlement.amount)}</Text>
+    </Pressable>
+  );
+});
+
 export default function ExpensesScreen({ navigation }: Props) {
   const { session, coupleState, coupleMembers } = useAuth();
 
@@ -228,26 +330,10 @@ export default function ExpensesScreen({ navigation }: Props) {
     }
   };
 
-  const splitBadge = (expense: Expense) => {
-    if (expense.shares.length !== 2 || expense.amount <= 0) return 'división';
-
-    // Uno asume todo (una share en 0): invitación si la asumió quien pagó,
-    // adelanto si la asume el otro (queda debiendo).
-    const zeroShare = expense.shares.find((share) => share.owed_amount < 1);
-    if (zeroShare) {
-      const assumer = expense.shares.find((share) => share.owed_amount >= 1);
-      return assumer?.user_id === expense.paid_by_user_id
-        ? 'Invitación'
-        : 'Adelanto';
-    }
-
-    const pctA = Math.round(
-      (expense.shares[0].owed_amount / expense.amount) * 100
-    );
-
-    if (pctA === 50) return '50/50';
-    return `${pctA}/${100 - pctA}`;
-  };
+  const handleEditExpense = useCallback((expense: Expense) => {
+    setEditingExpense(expense);
+    setFormVisible(true);
+  }, []);
 
   const handlePrevMonth = () => {
     setIsLoading(true);
@@ -519,72 +605,20 @@ export default function ExpensesScreen({ navigation }: Props) {
             </Text>
           ) : (
             <View style={styles.list}>
-              {listItems.map((item) =>
-                item.type === 'expense' ? (
-                  <Pressable
-                    key={`e-${item.expense.id}`}
-                    style={styles.expenseRow}
-                    onPress={() => {
-                      setEditingExpense(item.expense);
-                      setFormVisible(true);
-                    }}
-                    onLongPress={() =>
-                      setConfirmDelete({
-                        kind: 'expense',
-                        id: item.expense.id,
-                        label: item.expense.title,
-                      })
-                    }
-                  >
-                    <View style={styles.expenseTextWrap}>
-                      <Text style={styles.expenseTitle} numberOfLines={1}>
-                        {item.expense.title}
-                      </Text>
-                      <Text style={styles.expenseSubtitle}>
-                        {formatDayMonth(item.expense.spent_at)} · pagó{' '}
-                        {nameByUserId.get(item.expense.paid_by_user_id)} ·{' '}
-                        {splitBadge(item.expense)}
-                        {item.expense.event_id
-                          ? ` · ${eventNameById.get(item.expense.event_id) ?? 'evento'}`
-                          : ''}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.expenseAmount}>
-                      {formatCLP(item.expense.amount)}
-                    </Text>
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    key={`s-${item.settlement.id}`}
-                    style={[styles.expenseRow, styles.settlementRow]}
-                    onLongPress={() =>
-                      setConfirmDelete({
-                        kind: 'settlement',
-                        id: item.settlement.id,
-                        label: `saldado de ${formatCLP(item.settlement.amount)}`,
-                      })
-                    }
-                  >
-                    <Ionicons name="swap-horizontal" size={18} color="#2E7D32" />
-
-                    <View style={styles.expenseTextWrap}>
-                      <Text style={styles.settlementTitle}>
-                        Saldado: {nameByUserId.get(item.settlement.from_user_id)}{' '}
-                        le pagó a {nameByUserId.get(item.settlement.to_user_id)}
-                      </Text>
-                      <Text style={styles.expenseSubtitle}>
-                        {formatDayMonth(item.settlement.settled_at)}
-                        {item.settlement.note ? ` · ${item.settlement.note}` : ''}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.settlementAmount}>
-                      {formatCLP(item.settlement.amount)}
-                    </Text>
-                  </Pressable>
-                )
-              )}
+              {listItems.map((item) => (
+                <LedgerRow
+                  key={
+                    item.type === 'expense'
+                      ? `e-${item.expense.id}`
+                      : `s-${item.settlement.id}`
+                  }
+                  item={item}
+                  nameByUserId={nameByUserId}
+                  eventNameById={eventNameById}
+                  onEditExpense={handleEditExpense}
+                  onRequestDelete={setConfirmDelete}
+                />
+              ))}
             </View>
           )}
 

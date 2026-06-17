@@ -371,27 +371,6 @@ export async function deleteEvent(eventId: string) {
   }
 }
 
-async function fetchSharesFor(expenseIds: string[]) {
-  if (!expenseIds.length) {
-    return [] as { expense_id: string; user_id: string; owed_amount: number }[];
-  }
-
-  const { data, error } = await supabase
-    .from('expense_shares')
-    .select('expense_id, user_id, owed_amount')
-    .in('expense_id', expenseIds);
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as {
-    expense_id: string;
-    user_id: string;
-    owed_amount: number;
-  }[];
-}
-
 export async function fetchExpenseAverages(
   coupleId: string
 ): Promise<ExpenseAverages> {
@@ -526,7 +505,36 @@ export async function fetchExpenseAnalysis(params: {
   const monthIndex = new Map(months.map((key, i) => [key, i]));
   const monthLabels = months.map((key) => monthLabelByKey.get(key) ?? key);
 
-  const shares = await fetchSharesFor(rows.map((row) => row.id));
+  // Las shares se filtran por couple_id + (evento/rango) vía join embebido, en
+  // vez de pasar la lista de expense_id (que sin filtro y con muchos gastos
+  // puede romper la URL de PostgREST). Conservamos expense_id para mapear cada
+  // share a su bucket mensual.
+  let sharesQuery = supabase
+    .from('expense_shares')
+    .select('expense_id, user_id, owed_amount, expenses!inner(spent_at, event_id)')
+    .eq('couple_id', params.coupleId);
+
+  if (params.eventId) {
+    sharesQuery = sharesQuery.eq('expenses.event_id', params.eventId);
+  }
+  if (params.fromYmd && params.toYmd) {
+    const { fromIso, toIso } = ymdToBounds(params.fromYmd, params.toYmd);
+    sharesQuery = sharesQuery
+      .gte('expenses.spent_at', fromIso)
+      .lte('expenses.spent_at', toIso);
+  }
+
+  const { data: shareData, error: shareError } = await sharesQuery;
+
+  if (shareError) {
+    throw shareError;
+  }
+
+  const shares = (shareData ?? []) as {
+    expense_id: string;
+    user_id: string;
+    owed_amount: number;
+  }[];
   const consumedByUser = new Map<string, number>();
   const monthlyByUser = new Map<string, number[]>();
 

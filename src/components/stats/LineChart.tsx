@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Svg, { Circle, Polygon, Polyline } from 'react-native-svg';
 
 export type LinePoint = {
@@ -21,6 +27,12 @@ export default function LineChart({
   formatValue,
 }: Props) {
   const [width, setWidth] = useState(0);
+  // Punto seleccionado: por defecto el último (mes más reciente).
+  const [selected, setSelected] = useState(data.length - 1);
+
+  useEffect(() => {
+    setSelected(data.length - 1);
+  }, [data.length]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     setWidth(event.nativeEvent.layout.width);
@@ -28,7 +40,7 @@ export default function LineChart({
 
   const max = Math.max(...data.map((point) => point.value), 1);
   const padX = 12;
-  const padTop = 18;
+  const padTop = 22;
   const padBottom = 8;
   const innerWidth = Math.max(width - padX * 2, 1);
   const innerHeight = height - padTop - padBottom;
@@ -50,12 +62,41 @@ export default function LineChart({
     padX + innerWidth
   },${height - padBottom}`;
 
-  const maxIndex = data.findIndex((point) => point.value === max);
+  const colWidth = width / Math.max(data.length, 1);
+  // Con muchos puntos las etiquetas se solapan: mostramos ~8 como máximo,
+  // dejando el hueco para no descuadrar el space-between.
+  const labelStep = Math.max(1, Math.ceil(data.length / 8));
+  const selectedCoord =
+    selected >= 0 && selected < coords.length ? coords[selected] : null;
+  const tooltipWidth = 110;
 
   return (
     <View onLayout={handleLayout}>
       {width > 0 && (
         <>
+          {/* Tooltip del punto seleccionado, con el monto. */}
+          {selectedCoord && (
+            <View
+              style={[
+                styles.tooltip,
+                {
+                  width: tooltipWidth,
+                  left: Math.min(
+                    Math.max(selectedCoord.x - tooltipWidth / 2, 0),
+                    Math.max(width - tooltipWidth, 0)
+                  ),
+                },
+              ]}
+            >
+              <Text style={styles.tooltipText} numberOfLines={1}>
+                {data[selected].label} ·{' '}
+                {formatValue
+                  ? formatValue(data[selected].value)
+                  : data[selected].value}
+              </Text>
+            </View>
+          )}
+
           <Svg width={width} height={height}>
             <Polygon points={areaPoints} fill={color} opacity={0.14} />
 
@@ -68,42 +109,41 @@ export default function LineChart({
               strokeLinecap="round"
             />
 
-            {coords.map((coord, index) => (
-              <Circle
-                key={data[index].label}
-                cx={coord.x}
-                cy={coord.y}
-                r={index === maxIndex ? 5 : 4}
-                fill={index === maxIndex ? color : '#FFF0F4'}
-                stroke={color}
-                strokeWidth={2.5}
-              />
-            ))}
+            {coords.map((coord, index) => {
+              const isSel = index === selected;
+              return (
+                <Circle
+                  key={data[index].label}
+                  cx={coord.x}
+                  cy={coord.y}
+                  r={isSel ? 6 : 4}
+                  fill={isSel ? color : '#FFF0F4'}
+                  stroke={color}
+                  strokeWidth={2.5}
+                />
+              );
+            })}
           </Svg>
 
-          {maxIndex >= 0 && data[maxIndex].value > 0 && (
-            <Text
-              style={[
-                styles.peakLabel,
-                {
-                  left: Math.min(
-                    Math.max(coords[maxIndex].x - 40, 0),
-                    width - 80
-                  ),
-                  top: Math.max(coords[maxIndex].y - 18, 0),
-                },
-              ]}
-            >
-              {formatValue
-                ? formatValue(data[maxIndex].value)
-                : data[maxIndex].value}
-            </Text>
-          )}
+          {/* Columnas transparentes para tocar cada mes. */}
+          <View style={[StyleSheet.absoluteFill, styles.touchRow]}>
+            {data.map((point, index) => (
+              <Pressable
+                key={`touch-${point.label}`}
+                style={{ width: colWidth, height }}
+                onPress={() => setSelected(index)}
+              />
+            ))}
+          </View>
 
           <View style={styles.labelsRow}>
-            {data.map((point) => (
-              <Text key={point.label} style={styles.label}>
-                {point.label}
+            {data.map((point, index) => (
+              <Text
+                key={`${point.label}-${index}`}
+                style={styles.label}
+                numberOfLines={1}
+              >
+                {index % labelStep === 0 ? point.label : ''}
               </Text>
             ))}
           </View>
@@ -114,6 +154,9 @@ export default function LineChart({
 }
 
 const styles = StyleSheet.create({
+  touchRow: {
+    flexDirection: 'row',
+  },
   labelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -125,12 +168,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 10,
   },
-  peakLabel: {
+  tooltip: {
     position: 'absolute',
-    width: 80,
-    textAlign: 'center',
-    color: '#7C3043',
+    top: 0,
+    zIndex: 2,
+    backgroundColor: '#7C3043',
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  tooltipText: {
+    color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 10,
+    fontSize: 11,
+    textAlign: 'center',
   },
 });

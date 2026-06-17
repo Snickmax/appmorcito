@@ -37,7 +37,8 @@ export async function fetchWishlistItems(params: {
     .eq('owner_user_id', ownerUserId)
     .neq('status', 'archived')
     .order('status', { ascending: true })
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(200);
 
   if (error) {
     throw error;

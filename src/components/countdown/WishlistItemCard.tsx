@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { WishlistItem } from '../../types/countdown';
+import { WishlistItem, WishlistStatus } from '../../types/countdown';
 import {
   formatMoney,
   formatPriorityLabel,
@@ -16,18 +16,12 @@ import {
 type Props = {
   item: WishlistItem;
   disabled?: boolean;
-  onMarkPurchased: () => void;
-  onReopen: () => void;
-  onArchive: () => void;
+  // Único callback estable (id + estado) para que React.memo evite re-renderizar
+  // toda la lista al tocar un solo ítem.
+  onChangeStatus: (itemId: string, status: WishlistStatus) => void;
 };
 
-export default function WishlistItemCard({
-  item,
-  disabled = false,
-  onMarkPurchased,
-  onReopen,
-  onArchive,
-}: Props) {
+function WishlistItemCard({ item, disabled = false, onChangeStatus }: Props) {
   const handleOpenUrl = async () => {
     if (!item.url) return;
 
@@ -74,7 +68,7 @@ export default function WishlistItemCard({
           <>
             <Pressable
               style={[styles.actionButton, disabled && styles.disabledButton]}
-              onPress={onMarkPurchased}
+              onPress={() => onChangeStatus(item.id, 'purchased')}
               disabled={disabled}
             >
               <Text style={styles.actionButtonText}>Comprado</Text>
@@ -82,7 +76,7 @@ export default function WishlistItemCard({
 
             <Pressable
               style={[styles.actionButton, disabled && styles.disabledButton]}
-              onPress={onArchive}
+              onPress={() => onChangeStatus(item.id, 'archived')}
               disabled={disabled}
             >
               <Text style={styles.actionButtonText}>Archivar</Text>
@@ -92,7 +86,7 @@ export default function WishlistItemCard({
           <>
             <Pressable
               style={[styles.actionButton, disabled && styles.disabledButton]}
-              onPress={onReopen}
+              onPress={() => onChangeStatus(item.id, 'active')}
               disabled={disabled}
             >
               <Text style={styles.actionButtonText}>Reactivar</Text>
@@ -100,7 +94,7 @@ export default function WishlistItemCard({
 
             <Pressable
               style={[styles.actionButton, disabled && styles.disabledButton]}
-              onPress={onArchive}
+              onPress={() => onChangeStatus(item.id, 'archived')}
               disabled={disabled}
             >
               <Text style={styles.actionButtonText}>Archivar</Text>
@@ -111,6 +105,8 @@ export default function WishlistItemCard({
     </View>
   );
 }
+
+export default React.memo(WishlistItemCard);
 
 const styles = StyleSheet.create({
   card: {

@@ -188,7 +188,7 @@ export default function ExpenseAnalysisCard({
               <Text style={styles.sectionLabel}>
                 Gasto real por mes (cada uno)
               </Text>
-              <MultiLineChart series={lineSeries} />
+              <MultiLineChart series={lineSeries} formatValue={formatCLP} />
             </>
           )}
 

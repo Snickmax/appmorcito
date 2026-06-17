@@ -31,9 +31,8 @@ export type CoupleStats = {
     balanceByUser: PerUserCount;
     monthTotal: number;
     prevMonthTotal: number;
-    // Etiquetas de mes compartidas y consumo por usuario por mes (2 líneas).
-    monthLabels: string[];
-    monthlyByUser: Map<string, number[]>;
+    // Total por mes (últimos 6 meses) para el gráfico de una línea.
+    monthlySeries: MonthlyPoint[];
     // Reparto del gasto (del periodo) por evento.
     eventsSplit: MonthlyPoint[];
   };
@@ -98,6 +97,35 @@ const MONTH_SHORT = [
   'Dic',
 ];
 
+const SERIES_MONTHS = 6;
+
+// Total de gasto por mes de los últimos 6 meses (independiente del filtro de
+// rango, igual que la vista clásica de Estadísticas).
+function buildMonthlySeries(
+  rows: { spent_at: string; amount: number }[]
+): MonthlyPoint[] {
+  const now = new Date();
+  const buckets: { key: string; label: string; value: number }[] = [];
+
+  for (let offset = SERIES_MONTHS - 1; offset >= 0; offset -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    buckets.push({
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      label: MONTH_SHORT[date.getMonth()],
+      value: 0,
+    });
+  }
+
+  const byKey = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+  rows.forEach((row) => {
+    const date = new Date(row.spent_at);
+    const bucket = byKey.get(`${date.getFullYear()}-${date.getMonth()}`);
+    if (bucket) bucket.value += Number(row.amount);
+  });
+
+  return buckets.map(({ label, value }) => ({ label, value }));
+}
 
 export async function fetchCoupleStats(
   coupleId: string,
@@ -106,6 +134,7 @@ export async function fetchCoupleStats(
   const { since, until } = rangeBounds(filters.range);
   const currentMonth = monthRangeOffset(0);
   const prevMonth = monthRangeOffset(-1);
+  const seriesStart = monthRangeOffset(-(SERIES_MONTHS - 1)).start;
 
   // Si hay filtro de categoría, primero se resuelven los spots de esa categoría.
   let categorySpotIds: string[] | null = null;
@@ -149,6 +178,7 @@ export async function fetchCoupleStats(
     balances,
     monthExpenses,
     prevMonthExpenses,
+    seriesExpenses,
     periodExpenses,
     eventsResult,
     spotsResult,
@@ -169,6 +199,11 @@ export async function fetchCoupleStats(
       .eq('couple_id', coupleId)
       .gte('spent_at', prevMonth.start)
       .lt('spent_at', prevMonth.end),
+    supabase
+      .from('expenses')
+      .select('spent_at, amount')
+      .eq('couple_id', coupleId)
+      .gte('spent_at', seriesStart),
     periodExpensesQuery,
     supabase
       .from('expense_events')
@@ -189,6 +224,7 @@ export async function fetchCoupleStats(
   for (const result of [
     monthExpenses,
     prevMonthExpenses,
+    seriesExpenses,
     periodExpenses,
     eventsResult,
     spotsResult,
@@ -204,8 +240,7 @@ export async function fetchCoupleStats(
   const sumAmounts = (rows: { amount: number }[] | null) =>
     (rows ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
 
-  // --- Gastos del periodo: consumo por persona, reparto por evento y serie
-  //     mensual de consumo por usuario (para el gráfico de dos líneas) ---
+  // --- Gastos del periodo: consumo por persona y reparto por evento ---
   const expenseRows = (periodExpenses.data ?? []) as {
     id: string;
     amount: number;
@@ -213,58 +248,28 @@ export async function fetchCoupleStats(
     event_id: string | null;
   }[];
 
-  // Meses presentes (orden cronológico, máx. 12) y mapa expense → mes.
-  const monthKeyByExpense = new Map<string, string>();
-  const monthOrder: string[] = [];
-  const monthSeen = new Set<string>();
-  const monthLabelByKey = new Map<string, string>();
-  expenseRows.forEach((row) => {
-    const date = new Date(row.spent_at);
-    const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
-    monthKeyByExpense.set(row.id, key);
-    if (!monthSeen.has(key)) {
-      monthSeen.add(key);
-      monthOrder.push(key);
-      monthLabelByKey.set(key, MONTH_SHORT[date.getMonth()]);
-    }
-  });
-  const months = monthOrder.slice(-12);
-  const monthIndex = new Map(months.map((key, i) => [key, i]));
-  const expenseMonthLabels = months.map((key) => monthLabelByKey.get(key) ?? key);
-
   const consumedByUser: PerUserCount = new Map();
-  const monthlyByUser = new Map<string, number[]>();
   if (expenseRows.length) {
-    const { data: shareData, error: shareError } = await supabase
+    // Filtramos las shares por couple_id (la tabla ya lo trae) y el rango de
+    // fechas vía join embebido, en vez de pasar la lista de expense_id (que sin
+    // cota puede romper la URL de PostgREST con miles de gastos).
+    let sharesQuery = supabase
       .from('expense_shares')
-      .select('expense_id, user_id, owed_amount')
-      .in(
-        'expense_id',
-        expenseRows.map((row) => row.id)
-      );
+      .select('user_id, owed_amount, expenses!inner(spent_at)')
+      .eq('couple_id', coupleId);
+    if (since) sharesQuery = sharesQuery.gte('expenses.spent_at', since);
+    if (until) sharesQuery = sharesQuery.lte('expenses.spent_at', until);
+
+    const { data: shareData, error: shareError } = await sharesQuery;
 
     if (shareError) {
       throw shareError;
     }
 
     (
-      (shareData ?? []) as {
-        expense_id: string;
-        user_id: string;
-        owed_amount: number;
-      }[]
+      (shareData ?? []) as { user_id: string; owed_amount: number }[]
     ).forEach((share) => {
-      const owed = Number(share.owed_amount);
-      increment(consumedByUser, share.user_id, owed);
-
-      if (!monthlyByUser.has(share.user_id)) {
-        monthlyByUser.set(share.user_id, new Array(months.length).fill(0));
-      }
-      const key = monthKeyByExpense.get(share.expense_id);
-      const idx = key != null ? monthIndex.get(key) : undefined;
-      if (idx != null) {
-        monthlyByUser.get(share.user_id)![idx] += owed;
-      }
+      increment(consumedByUser, share.user_id, Number(share.owed_amount));
     });
   }
 
@@ -385,8 +390,9 @@ export async function fetchCoupleStats(
       balanceByUser,
       monthTotal: sumAmounts(monthExpenses.data as { amount: number }[]),
       prevMonthTotal: sumAmounts(prevMonthExpenses.data as { amount: number }[]),
-      monthLabels: expenseMonthLabels,
-      monthlyByUser,
+      monthlySeries: buildMonthlySeries(
+        (seriesExpenses.data ?? []) as { spent_at: string; amount: number }[]
+      ),
       eventsSplit,
     },
     dates: {
@@ -406,88 +412,6 @@ export async function fetchCoupleStats(
       hasData: activeByOwner.size > 0 || purchasedByBuyer.size > 0,
       activeByOwner,
       purchasedByBuyer,
-    },
-  };
-}
-
-// Datos de ejemplo para previsualizar todos los gráficos mientras la pareja
-// todavía no acumula historia real. No tocan la base de datos y no responden
-// a los filtros.
-export function buildMockStats(userIds: [string, string]): CoupleStats {
-  const [a, b] = userIds;
-  const now = new Date();
-
-  const monthLabels: string[] = [];
-  for (let offset = 5; offset >= 0; offset -= 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    monthLabels.push(MONTH_SHORT[date.getMonth()]);
-  }
-  const monthlyByUser = new Map<string, number[]>([
-    [a, [62000, 41000, 88000, 53000, 96000, 49300]],
-    [b, [86000, 55500, 85200, 68800, 93400, 93000]],
-  ]);
-
-  return {
-    expenses: {
-      hasData: true,
-      consumedByUser: new Map([
-        [a, 389300],
-        [b, 481900],
-      ]),
-      total: 871200,
-      balanceByUser: new Map([
-        [a, 23450],
-        [b, -23450],
-      ]),
-      monthTotal: 142300,
-      prevMonthTotal: 189400,
-      monthLabels,
-      monthlyByUser,
-      eventsSplit: [
-        { label: 'Sin evento', value: 397200 },
-        { label: 'Suscripciones', value: 186000 },
-        { label: 'Viaje a Japón', value: 168000 },
-        { label: 'Cumpleaños Coni', value: 120000 },
-      ],
-    },
-    dates: {
-      hasData: true,
-      pending: 7,
-      done: 12,
-      spotsCreatedByUser: new Map([
-        [a, 11],
-        [b, 8],
-      ]),
-      visitsByUser: new Map([
-        [a, 9],
-        [b, 14],
-      ]),
-      photosByUser: new Map([
-        [a, 6],
-        [b, 11],
-      ]),
-    },
-    memory: {
-      hasData: true,
-      sessionsByUser: new Map([
-        [a, 23],
-        [b, 31],
-      ]),
-      bestByUser: new Map([
-        [a, { moves: 11, seconds: 47 }],
-        [b, { moves: 9, seconds: 52 }],
-      ]),
-    },
-    wishlist: {
-      hasData: true,
-      activeByOwner: new Map([
-        [a, 5],
-        [b, 3],
-      ]),
-      purchasedByBuyer: new Map([
-        [a, 4],
-        [b, 7],
-      ]),
     },
   };
 }

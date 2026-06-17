@@ -14,17 +14,13 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../providers/AuthProvider';
-import {
-  buildMockStats,
-  CoupleStats,
-  fetchCoupleStats,
-} from '../lib/statsService';
+import { CoupleStats, fetchCoupleStats } from '../lib/statsService';
 import { formatCLP } from '../lib/expensesService';
 import { fetchCategories } from '../lib/dateSpotsService';
 import { DateCategory } from '../types/dates';
 import StatBar from '../components/stats/StatBar';
 import DonutChart from '../components/stats/DonutChart';
-import MultiLineChart from '../components/stats/MultiLineChart';
+import LineChart from '../components/stats/LineChart';
 import DateRangeFilter, { DateRange } from '../components/DateRangeFilter';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Stats'>;
@@ -60,7 +56,6 @@ export default function StatsScreen({ navigation }: Props) {
 
   const [realStats, setRealStats] = useState<CoupleStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [demoMode, setDemoMode] = useState(false);
   const [range, setRange] = useState<DateRange | null>(null);
   const [dateCategoryId, setDateCategoryId] = useState<string | null>(null);
   const [categories, setCategories] = useState<DateCategory[]>([]);
@@ -101,15 +96,7 @@ export default function StatsScreen({ navigation }: Props) {
     }, [loadStats])
   );
 
-  const stats = useMemo<CoupleStats | null>(() => {
-    if (demoMode && coupleMembers.length >= 2) {
-      return buildMockStats([
-        coupleMembers[0].user_id,
-        coupleMembers[1].user_id,
-      ]);
-    }
-    return realStats;
-  }, [demoMode, coupleMembers, realStats]);
+  const stats = realStats;
 
   const memberSegments = (values: Map<string, number>) =>
     coupleMembers.map((member, index) => ({
@@ -158,22 +145,8 @@ export default function StatsScreen({ navigation }: Props) {
     )} a ${nameByUserId.get(creditor.user_id)}`;
   }, [stats, coupleMembers, nameByUserId]);
 
-  const periodLabel = useMemo(() => {
-    if (demoMode || !range) return 'histórico';
-    return 'rango';
-  }, [demoMode, range]);
+  const periodLabel = range ? 'rango' : 'histórico';
 
-  const expenseLineSeries = useMemo(() => {
-    if (!stats) return [];
-    return coupleMembers.map((member, index) => ({
-      label: nameByUserId.get(member.user_id) ?? 'miembro',
-      color: MEMBER_COLORS[index % MEMBER_COLORS.length],
-      points: stats.expenses.monthLabels.map((label, idx) => ({
-        label,
-        value: stats.expenses.monthlyByUser.get(member.user_id)?.[idx] ?? 0,
-      })),
-    }));
-  }, [stats, coupleMembers, nameByUserId]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -189,31 +162,11 @@ export default function StatsScreen({ navigation }: Props) {
           <Text style={styles.headerTitle}>Estadísticas</Text>
         </View>
 
-        <Pressable
-          style={[styles.demoToggle, demoMode && styles.demoToggleOn]}
-          onPress={() => setDemoMode((prev) => !prev)}
-        >
-          <Ionicons
-            name={demoMode ? 'eye' : 'eye-outline'}
-            size={16}
-            color={demoMode ? '#FFFFFF' : '#9E4258'}
-          />
-          <Text
-            style={[styles.demoToggleText, demoMode && styles.demoToggleTextOn]}
-          >
-            {demoMode
-              ? 'Viendo datos de ejemplo'
-              : 'Ver con datos de ejemplo'}
-          </Text>
-        </Pressable>
+        <View style={styles.rangeCard}>
+          <DateRangeFilter range={range} onChange={setRange} />
+        </View>
 
-        {!demoMode && (
-          <View style={styles.rangeCard}>
-            <DateRangeFilter range={range} onChange={setRange} />
-          </View>
-        )}
-
-        {isLoading && !demoMode ? (
+        {isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color="#C84B55" />
           </View>
@@ -263,14 +216,13 @@ export default function StatsScreen({ navigation }: Props) {
                     </>
                   )}
 
-                  {stats.expenses.monthLabels.length > 0 && (
-                    <>
-                      <Text style={styles.sectionLabel}>
-                        Gasto real por mes (cada uno)
-                      </Text>
-                      <MultiLineChart series={expenseLineSeries} />
-                    </>
-                  )}
+                  <Text style={styles.sectionLabel}>
+                    Evolución mensual (últimos 6 meses)
+                  </Text>
+                  <LineChart
+                    data={stats.expenses.monthlySeries}
+                    formatValue={formatCLP}
+                  />
 
                   <View style={styles.miniRow}>
                     <View style={styles.miniBox}>
@@ -297,7 +249,7 @@ export default function StatsScreen({ navigation }: Props) {
             <View style={styles.card}>
               <SectionHeader icon="location" title="Citas" />
 
-              {!demoMode && categories.length > 0 && (
+              {categories.length > 0 && (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -521,26 +473,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 20,
-  },
-  demoToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#FFF0F4',
-    borderRadius: 16,
-    paddingVertical: 12,
-  },
-  demoToggleOn: {
-    backgroundColor: '#8E4FA8',
-  },
-  demoToggleText: {
-    color: '#9E4258',
-    fontWeight: '900',
-    fontSize: 13,
-  },
-  demoToggleTextOn: {
-    color: '#FFFFFF',
   },
   rangeCard: {
     backgroundColor: '#FFF0F4',
