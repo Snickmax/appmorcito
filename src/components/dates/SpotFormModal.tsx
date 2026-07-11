@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,14 +9,33 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateField from '../DateField';
+import FormModal from '../FormModal';
 import { DateCategory, DateSpot } from '../../types/dates';
 
 export type SpotFormValues = {
   title: string;
   description: string | null;
   plannedDate: string | null;
+  budgetAmount: number | null;
+  referenceUrl: string | null;
   categoryIds: string[];
 };
+
+function parseAmount(value: string): number | null {
+  const normalized = value.replace(/\./g, '').replace(',', '.').trim();
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  if (Number.isNaN(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+// canOpenURL rechaza URLs sin esquema, así que se normaliza al guardar.
+function normalizeUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 type Props = {
   visible: boolean;
@@ -45,6 +62,8 @@ export default function SpotFormModal({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [plannedDate, setPlannedDate] = useState('');
+  const [budgetText, setBudgetText] = useState('');
+  const [referenceUrl, setReferenceUrl] = useState('');
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [newCategoryVisible, setNewCategoryVisible] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -58,6 +77,12 @@ export default function SpotFormModal({
     setTitle(initialSpot?.title ?? initialTitle ?? '');
     setDescription(initialSpot?.description ?? '');
     setPlannedDate(initialSpot?.planned_date ?? '');
+    setBudgetText(
+      initialSpot?.budget_amount != null
+        ? String(Math.round(initialSpot.budget_amount))
+        : ''
+    );
+    setReferenceUrl(initialSpot?.reference_url ?? '');
     setCategoryIds(initialSpot?.categoryIds ?? []);
     setNewCategoryVisible(false);
     setNewCategoryName('');
@@ -97,19 +122,15 @@ export default function SpotFormModal({
       title: title.trim(),
       description: description.trim() || null,
       plannedDate: plannedDate || null,
+      budgetAmount: parseAmount(budgetText),
+      referenceUrl: normalizeUrl(referenceUrl),
       categoryIds,
     });
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.headerRow}>
+    <FormModal visible={visible} onRequestClose={onClose}>
+      <View style={styles.headerRow}>
               <Text style={styles.title}>
                 {isEdit ? 'Editar Cita' : 'Nueva Cita'}
               </Text>
@@ -143,6 +164,26 @@ export default function SpotFormModal({
               onChangeText={setDescription}
               multiline
               maxLength={600}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Presupuesto aprox. en CLP (opcional)"
+              placeholderTextColor="#A66B79"
+              value={budgetText}
+              onChangeText={setBudgetText}
+              keyboardType="numeric"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Link de referencia (opcional)"
+              placeholderTextColor="#A66B79"
+              value={referenceUrl}
+              onChangeText={setReferenceUrl}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
 
             <Text style={styles.sectionTitle}>Categorías</Text>
@@ -228,29 +269,11 @@ export default function SpotFormModal({
                 <Text style={styles.primaryButtonText}>Guardar</Text>
               )}
             </Pressable>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    </FormModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(63, 21, 32, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 360,
-    maxHeight: '85%',
-    backgroundColor: '#FFF0F4',
-    borderRadius: 24,
-    padding: 20,
-  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

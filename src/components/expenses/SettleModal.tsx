@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
-  View,
 } from 'react-native';
 import { formatCLP } from '../../lib/expensesService';
+import FormModal from '../FormModal';
 
 type Props = {
   visible: boolean;
@@ -52,9 +51,7 @@ export default function SettleModal({
   const canSubmit = !!amount && !submitting;
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
+    <FormModal visible={visible} onRequestClose={onClose} maxWidth={340}>
           <Text style={styles.title}>Saldar cuentas</Text>
 
           <Text style={styles.subtitle}>
@@ -108,27 +105,11 @@ export default function SettleModal({
           >
             <Text style={styles.secondaryButtonText}>Cancelar</Text>
           </Pressable>
-        </View>
-      </View>
-    </Modal>
+    </FormModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(63, 21, 32, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#FFF0F4',
-    borderRadius: 24,
-    padding: 20,
-  },
   title: {
     fontSize: 22,
     fontWeight: '900',

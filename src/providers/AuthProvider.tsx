@@ -52,6 +52,7 @@ type AuthContextType = {
   ) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshBootstrap: () => Promise<void>;
+  retryInit: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -107,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const initializingRef = useRef(true);
+  const isMountedRef = useRef(true);
 
   const clearBootstrap = () => {
     setProfile(null);
@@ -146,62 +148,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    let isMounted = true;
+  const initialize = async () => {
+    setLoading(true);
 
-    const initialize = async () => {
-      try {
-        const {
-          data: { session: initialSession },
-        } = await supabase.auth.getSession();
+    try {
+      const {
+        data: { session: initialSession },
+      } = await supabase.auth.getSession();
 
-        if (!isMounted) return;
+      if (!isMountedRef.current) return;
 
-        await applyBootstrapFromSession(initialSession ?? null);
-      } catch (error) {
-        console.error('Initial auth bootstrap error:', error);
-        if (isMounted) {
-          setSession(null);
-          clearBootstrap();
-        }
-      } finally {
-        if (isMounted) {
-          initializingRef.current = false;
-          setLoading(false);
-        }
+      await applyBootstrapFromSession(initialSession ?? null);
+    } catch (error) {
+      console.error('Initial auth bootstrap error:', error);
+      if (isMountedRef.current) {
+        setSession(null);
+        clearBootstrap();
       }
-    };
+    } finally {
+      if (isMountedRef.current) {
+        initializingRef.current = false;
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    isMountedRef.current = true;
 
     void initialize();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, nextSession) => {
+      (event, nextSession) => {
         if (event === 'INITIAL_SESSION' && initializingRef.current) {
           return;
         }
 
-        if (!isMounted) return;
+        // No hacer await de llamadas a Supabase dentro de este callback:
+        // se ejecuta con el lock de auth tomado y provoca deadlock (app
+        // colgada en el arranque). setTimeout difiere el trabajo fuera
+        // del lock.
+        setTimeout(async () => {
+          if (!isMountedRef.current) return;
 
-        setLoading(true);
+          if (event === 'TOKEN_REFRESHED') {
+            setSession(nextSession ?? null);
+            return;
+          }
 
-        try {
-          await applyBootstrapFromSession(nextSession ?? null);
-        } catch (error) {
-          console.error('onAuthStateChange bootstrap error:', error);
-          if (isMounted) {
-            setSession(null);
-            clearBootstrap();
+          setLoading(true);
+
+          try {
+            await applyBootstrapFromSession(nextSession ?? null);
+          } catch (error) {
+            console.error('onAuthStateChange bootstrap error:', error);
+            if (isMountedRef.current) {
+              setSession(null);
+              clearBootstrap();
+            }
+          } finally {
+            if (isMountedRef.current) {
+              setLoading(false);
+            }
           }
-        } finally {
-          if (isMounted) {
-            setLoading(false);
-          }
-        }
+        }, 0);
       }
     );
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -304,6 +319,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       },
       refreshBootstrap,
+      retryInit: () => {
+        void initialize();
+      },
     }),
     [session, loading, profile, coupleState, coupleMembers]
   );

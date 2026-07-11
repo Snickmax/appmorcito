@@ -7,7 +7,6 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FormModal from '../components/FormModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -599,9 +599,13 @@ export default function CountdownScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      <Modal visible={addModalVisible} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+      <FormModal
+        visible={addModalVisible}
+        onRequestClose={() => {
+          setAddModalVisible(false);
+          resetWishlistForm();
+        }}
+      >
             <Text style={styles.modalTitle}>
               Nuevo regalo para {getDisplayName(selectedWishlistOwner)}
             </Text>
@@ -697,9 +701,7 @@ export default function CountdownScreen({ navigation }: Props) {
             >
               <Text style={styles.secondaryButtonText}>Cancelar</Text>
             </Pressable>
-          </View>
-        </View>
-      </Modal>
+      </FormModal>
     </SafeAreaView>
   );
 }
@@ -895,20 +897,6 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.45,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(63, 21, 32, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#FFF0F4',
-    borderRadius: 24,
-    padding: 20,
   },
   modalTitle: {
     fontSize: 24,

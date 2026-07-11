@@ -1,6 +1,8 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Modal,
   Pressable,
   StyleSheet,
@@ -9,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DateCategory, DateSpot } from '../../types/dates';
-import { formatDateLong } from '../../utils/countdown';
+import { formatDateLong, formatMoney } from '../../utils/countdown';
 
 type Props = {
   spot: DateSpot | null;
@@ -45,6 +47,19 @@ export default function SpotDetailModal({
   const spotCategories = categories.filter((category) =>
     spot.categoryIds.includes(category.id)
   );
+
+  const handleOpenReferenceUrl = async () => {
+    if (!spot.reference_url) return;
+
+    const supported = await Linking.canOpenURL(spot.reference_url);
+
+    if (!supported) {
+      Alert.alert('Link inválido', 'No se pudo abrir este enlace.');
+      return;
+    }
+
+    await Linking.openURL(spot.reference_url);
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -96,6 +111,27 @@ export default function SpotDetailModal({
               <Text style={styles.fieldLabel}>Descripción</Text>
               <Text style={styles.fieldValue}>{spot.description}</Text>
             </>
+          )}
+
+          {spot.budget_amount != null && (
+            <>
+              <Text style={styles.fieldLabel}>Presupuesto aprox.</Text>
+              <Text style={styles.fieldValue}>
+                {formatMoney(spot.budget_amount)}
+              </Text>
+            </>
+          )}
+
+          {!!spot.reference_url && (
+            <Pressable
+              style={styles.referenceLink}
+              onPress={() => void handleOpenReferenceUrl()}
+            >
+              <Ionicons name="link-outline" size={16} color="#C84B55" />
+              <Text style={styles.referenceLinkText} numberOfLines={1}>
+                Ver referencia
+              </Text>
+            </Pressable>
           )}
 
           <View style={styles.counterRow}>
@@ -250,6 +286,17 @@ const styles = StyleSheet.create({
     color: '#7C3043',
     fontWeight: '700',
     marginBottom: 10,
+  },
+  referenceLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 10,
+  },
+  referenceLinkText: {
+    color: '#C84B55',
+    fontWeight: '900',
+    textDecorationLine: 'underline',
   },
   counterRow: {
     flexDirection: 'row',

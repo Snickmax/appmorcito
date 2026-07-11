@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useSyncExternalStore } from 'react';
+import { PixelRatio } from 'react-native';
 import { Marker } from 'react-native-maps';
+
+import {
+  getClusterIconUri,
+  requestClusterIcon,
+  subscribe,
+} from './clusterIconStore';
 
 type Props = {
   latitude: number;
@@ -9,51 +15,38 @@ type Props = {
   onPress: () => void;
 };
 
-// Workaround del bug react-native-maps#5877 (Android + Nueva Arquitectura):
-// los markers con vista hija y tracksViewChanges=false no se renderizan.
-// Se monta con tracking activo y se apaga una vez dibujada la burbuja.
+// Igual que SpotPin, la burbuja usa el prop nativo `image` (BitmapDescriptor):
+// react-native-maps con la Nueva Arquitectura renderiza mal los markers con
+// vistas hijas en Android (react-native-maps#5877; el círculo salía recortado
+// aunque el tracking quedara activo). El bitmap se genera en runtime por
+// ClusterIconFactory (view-shot), así el número funciona para cualquier count.
 export default function ClusterBubble({
   latitude,
   longitude,
   count,
   onPress,
 }: Props) {
-  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+  const uri = useSyncExternalStore(subscribe, () => getClusterIconUri(count));
 
   useEffect(() => {
-    const timer = setTimeout(() => setTracksViewChanges(false), 450);
-    return () => clearTimeout(timer);
-  }, []);
+    if (!uri) {
+      requestClusterIcon(count);
+    }
+  }, [uri, count]);
+
+  // Sin icono todavía (primera vez que aparece este count en la sesión):
+  // mejor nada por un frame que el pin rojo default del Marker sin image.
+  if (!uri) {
+    return null;
+  }
 
   return (
     <Marker
       coordinate={{ latitude, longitude }}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={tracksViewChanges}
+      image={{ uri, scale: PixelRatio.get() }}
       onPress={onPress}
-    >
-      <View collapsable={false} style={styles.bubble}>
-        <Text style={styles.text}>{count}</Text>
-      </View>
-    </Marker>
+      tracksViewChanges={false}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  bubble: {
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    backgroundColor: '#D96A7E',
-    borderWidth: 3,
-    borderColor: '#FFF0F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-  },
-  text: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 14,
-  },
-});

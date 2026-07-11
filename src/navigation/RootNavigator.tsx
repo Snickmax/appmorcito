@@ -1,10 +1,11 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { useAuth } from '../providers/AuthProvider';
 import { COLORS } from '../theme/colors';
+import SplashScene from '../components/SplashScene';
 
 import AuthScreen from '../screens/AuthScreen';
 import CoupleSetupScreen from '../screens/CoupleSetupScreen';
@@ -24,11 +25,37 @@ import StatsScreen from '../screens/StatsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const RETRY_AFTER_MS = 10000;
+
 function LoadingScreen() {
+  const { retryInit } = useAuth();
+  const [showRetry, setShowRetry] = useState(false);
+
+  useEffect(() => {
+    if (showRetry) return;
+
+    const timer = setTimeout(() => setShowRetry(true), RETRY_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [showRetry]);
+
+  const handleRetry = () => {
+    setShowRetry(false);
+    retryInit();
+  };
+
   return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#C84B55" />
-    </View>
+    <SplashScene>
+      {showRetry && (
+        <View style={styles.retryCard}>
+          <Text style={styles.retryText}>
+            Esto está tardando más de lo normal…
+          </Text>
+          <Pressable style={styles.retryButton} onPress={handleRetry}>
+            <Text style={styles.retryButtonText}>Volver a intentar</Text>
+          </Pressable>
+        </View>
+      )}
+    </SplashScene>
   );
 }
 
@@ -97,10 +124,29 @@ export default function RootNavigator() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.homeBackground,
+  retryCard: {
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    marginHorizontal: 32,
+  },
+  retryText: {
+    color: COLORS.text,
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: COLORS.stripe,
+    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

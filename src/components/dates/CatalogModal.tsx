@@ -14,6 +14,7 @@ import { DateCategory, DateSpot } from '../../types/dates';
 import { formatDateLong } from '../../utils/countdown';
 import { SPOT_PIN_COLORS } from './SpotPin';
 import ConfirmModal from '../ConfirmModal';
+import FormModal from '../FormModal';
 
 type Props = {
   visible: boolean;
@@ -221,14 +222,11 @@ export default function CatalogModal({
         onCancel={() => setDeletingCategory(null)}
       />
 
-      <Modal
+      <FormModal
         visible={!!renamingCategory}
-        transparent
-        animationType="fade"
         onRequestClose={() => setRenamingCategory(null)}
+        maxWidth={320}
       >
-        <View style={styles.renameBackdrop}>
-          <View style={styles.renameCard}>
             <Text style={styles.renameTitle}>Renombrar categoría</Text>
 
             <TextInput
@@ -256,9 +254,7 @@ export default function CatalogModal({
             >
               <Text style={styles.renameCancelText}>Cancelar</Text>
             </Pressable>
-          </View>
-        </View>
-      </Modal>
+      </FormModal>
     </Modal>
   );
 }
@@ -378,20 +374,6 @@ const styles = StyleSheet.create({
   countBadgeText: {
     color: '#FFFFFF',
     fontWeight: '900',
-  },
-  renameBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(63, 21, 32, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  renameCard: {
-    width: '100%',
-    maxWidth: 320,
-    backgroundColor: '#FFF0F4',
-    borderRadius: 24,
-    padding: 20,
   },
   renameTitle: {
     fontSize: 18,

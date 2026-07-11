@@ -41,3 +41,4 @@ pnpm dlx supabase migration repair --status reverted <timestamp>
 | `20260611150000` | Auditoría de wishlist: `created_by`, `purchased_by`, `purchased_at` | `rollbacks/20260611150000_wishlist_audit_down.sql` |
 | `20260612100000` | Fix signos de saldados en `v_expense_balance_by_user` | `rollbacks/20260612100000_fix_expense_balance_view_down.sql` |
 | `20260612150000` | Eventos de gastos: `expense_events` + `expenses.event_id` | `rollbacks/20260612150000_expense_events_down.sql` |
+| `20260711120000` | Citas: `budget_amount` y `reference_url` en `date_spots` | `rollbacks/20260711120000_date_spot_budget_link_down.sql` |

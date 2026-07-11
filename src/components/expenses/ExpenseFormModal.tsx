@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateField from '../DateField';
+import FormModal from '../FormModal';
 import { ActiveCoupleMember } from '../../providers/AuthProvider';
 import { Expense, ExpenseEvent } from '../../types/expenses';
 import { formatCLP } from '../../lib/expensesService';
@@ -221,14 +220,12 @@ export default function ExpenseFormModal({
   if (!memberA || !memberB) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.headerRow}>
+    <FormModal
+      visible={visible}
+      onRequestClose={onClose}
+      cardStyle={styles.tallCard}
+    >
+      <View style={styles.headerRow}>
               <Text style={styles.title}>
                 {isEdit ? 'Editar Gasto' : 'Nuevo Gasto'}
               </Text>
@@ -465,28 +462,13 @@ export default function ExpenseFormModal({
                 <Text style={styles.primaryButtonText}>Guardar</Text>
               )}
             </Pressable>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    </FormModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(63, 21, 32, 0.42)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 360,
+  tallCard: {
     maxHeight: '88%',
-    backgroundColor: '#FFF0F4',
-    borderRadius: 24,
-    padding: 20,
   },
   headerRow: {
     flexDirection: 'row',

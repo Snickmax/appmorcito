@@ -10,6 +10,8 @@ export type DateSpot = {
   longitude: number;
   status: DateSpotStatus;
   visit_count: number;
+  budget_amount: number | null;
+  reference_url: string | null;
   created_by: string;
   updated_by: string | null;
   created_at: string;

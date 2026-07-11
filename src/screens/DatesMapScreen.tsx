@@ -40,6 +40,7 @@ import SpotDetailModal from '../components/dates/SpotDetailModal';
 import AddVisitModal from '../components/dates/AddVisitModal';
 import CatalogModal from '../components/dates/CatalogModal';
 import ClusterBubble from '../components/dates/ClusterBubble';
+import ClusterIconFactory from '../components/dates/ClusterIconFactory';
 import ConfirmModal from '../components/ConfirmModal';
 import PlaceSearchBar from '../components/dates/PlaceSearchBar';
 import { PlaceResult, SearchViewbox } from '../lib/geocodingService';
@@ -215,6 +216,8 @@ export default function DatesMapScreen({ navigation }: Props) {
           title: values.title,
           description: values.description,
           plannedDate: values.plannedDate,
+          budgetAmount: values.budgetAmount,
+          referenceUrl: values.referenceUrl,
           categoryIds: values.categoryIds,
         });
         upsertSpotInState(updated);
@@ -230,6 +233,8 @@ export default function DatesMapScreen({ navigation }: Props) {
           plannedDate: values.plannedDate,
           latitude: pendingCoords.latitude,
           longitude: pendingCoords.longitude,
+          budgetAmount: values.budgetAmount,
+          referenceUrl: values.referenceUrl,
           categoryIds: values.categoryIds,
         });
         upsertSpotInState(created);
@@ -459,6 +464,7 @@ export default function DatesMapScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <ClusterIconFactory />
       <ClusteredMapView
         ref={mapRef as unknown as React.Ref<MapView>}
         style={StyleSheet.absoluteFill}

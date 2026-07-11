@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
+  KeyboardAvoidingView,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../providers/AuthProvider';
 import DateField from '../components/DateField';
+import AlertModal from '../components/AlertModal';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function CoupleSetupScreen() {
   const { profile, refreshBootstrap, signOut } = useAuth();
@@ -19,6 +22,11 @@ export default function CoupleSetupScreen() {
   const [relationshipStartDate, setRelationshipStartDate] = useState('');
   const [memberNickname, setMemberNickname] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [alertInfo, setAlertInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
 
   useEffect(() => {
     if (!memberNickname && profile?.display_name) {
@@ -28,7 +36,10 @@ export default function CoupleSetupScreen() {
 
   const handleCreate = async () => {
     if (!relationshipStartDate) {
-      Alert.alert('Falta fecha', 'Selecciona la fecha con el calendario.');
+      setAlertInfo({
+        title: 'Falta fecha',
+        message: 'Selecciona la fecha con el calendario.',
+      });
       return;
     }
 
@@ -39,7 +50,7 @@ export default function CoupleSetupScreen() {
     });
 
     if (error) {
-      Alert.alert('Error', error.message);
+      setAlertInfo({ title: 'Error', message: error.message });
       return;
     }
 
@@ -48,7 +59,10 @@ export default function CoupleSetupScreen() {
 
   const handleJoin = async () => {
     if (!inviteCode.trim()) {
-      Alert.alert('Falta código', 'Ingresa el código de invitación.');
+      setAlertInfo({
+        title: 'Falta código',
+        message: 'Ingresa el código de invitación.',
+      });
       return;
     }
 
@@ -59,30 +73,21 @@ export default function CoupleSetupScreen() {
     });
 
     if (error) {
-      Alert.alert('Error', error.message);
+      setAlertInfo({ title: 'Error', message: error.message });
       return;
     }
 
     await refreshBootstrap();
   };
 
-  const handleConfirmSignOut = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Quieres cerrar sesión?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sí, cerrar sesión',
-          style: 'destructive',
-          onPress: () => void signOut(),
-        },
-      ]
-    );
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
       <View style={styles.card}>
         <Text style={styles.title}>Configurar pareja</Text>
         <Text style={styles.subtitle}>
@@ -146,10 +151,35 @@ export default function CoupleSetupScreen() {
           </>
         )}
 
-        <Pressable style={styles.secondaryButton} onPress={handleConfirmSignOut}>
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() => setSignOutConfirmVisible(true)}
+        >
           <Text style={styles.secondaryButtonText}>Cerrar sesión</Text>
         </Pressable>
       </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <AlertModal
+        visible={!!alertInfo}
+        title={alertInfo?.title}
+        message={alertInfo?.message ?? ''}
+        onClose={() => setAlertInfo(null)}
+      />
+
+      <ConfirmModal
+        visible={signOutConfirmVisible}
+        title="Cerrar sesión"
+        message="¿Quieres cerrar sesión?"
+        confirmLabel="Sí, cerrar sesión"
+        cancelLabel="No"
+        onConfirm={() => {
+          setSignOutConfirmVisible(false);
+          void signOut();
+        }}
+        onCancel={() => setSignOutConfirmVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -158,6 +188,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFD4E0',
+  },
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 20,
   },

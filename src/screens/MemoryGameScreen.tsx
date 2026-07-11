@@ -26,6 +26,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { MemoryCard } from '../components/MemoryCard';
+import FormModal from '../components/FormModal';
 import { ZoomableBoardCanvas } from '../components/ZoomableBoardCanvas';
 import { useMemoryGame } from '../hooks/useMemoryGame';
 import {
@@ -1057,9 +1058,10 @@ export default function MemoryGameScreen({ navigation }: Props) {
         </View>
       )}
 
-      <Modal visible={renameModalVisible} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+      <FormModal
+        visible={renameModalVisible}
+        onRequestClose={() => setRenameModalVisible(false)}
+      >
             <Text style={styles.modalTitle}>Renombrar set</Text>
 
             <TextInput
@@ -1086,9 +1088,7 @@ export default function MemoryGameScreen({ navigation }: Props) {
             >
               <Text style={styles.secondaryButtonText}>Cancelar</Text>
             </Pressable>
-          </View>
-        </View>
-      </Modal>
+      </FormModal>
 
       <Modal visible={isWon} transparent animationType="fade">
         <View style={styles.modalBackdrop}>

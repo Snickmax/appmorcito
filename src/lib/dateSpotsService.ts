@@ -16,7 +16,7 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
 const PHOTO_MAX_WIDTH = 1280;
 
 const SPOT_COLUMNS =
-  'id, couple_id, title, description, planned_date, latitude, longitude, status, visit_count, created_by, updated_by, created_at, updated_at';
+  'id, couple_id, title, description, planned_date, latitude, longitude, status, visit_count, budget_amount, reference_url, created_by, updated_by, created_at, updated_at';
 
 const VISIT_COLUMNS =
   'id, spot_id, couple_id, visited_at, photo_path, created_by, created_at';
@@ -172,6 +172,8 @@ export async function createDateSpot(params: {
   plannedDate: string | null;
   latitude: number;
   longitude: number;
+  budgetAmount: number | null;
+  referenceUrl: string | null;
   categoryIds: string[];
 }): Promise<DateSpot> {
   const { data, error } = await supabase
@@ -183,6 +185,8 @@ export async function createDateSpot(params: {
       planned_date: params.plannedDate,
       latitude: params.latitude,
       longitude: params.longitude,
+      budget_amount: params.budgetAmount,
+      reference_url: params.referenceUrl,
       created_by: params.userId,
     })
     .select(SPOT_COLUMNS)
@@ -211,6 +215,8 @@ export async function updateDateSpot(params: {
   title: string;
   description: string | null;
   plannedDate: string | null;
+  budgetAmount: number | null;
+  referenceUrl: string | null;
   categoryIds: string[];
 }): Promise<DateSpot> {
   const { data, error } = await supabase
@@ -219,6 +225,8 @@ export async function updateDateSpot(params: {
       title: params.title,
       description: params.description,
       planned_date: params.plannedDate,
+      budget_amount: params.budgetAmount,
+      reference_url: params.referenceUrl,
       updated_by: params.userId,
     })
     .eq('id', params.spotId)
