@@ -3,6 +3,8 @@
 App de pareja: planificá y registrá **citas** (lugares y visitas con fotos), llevá las **cuentas
 compartidas** (gastos y eventos), una **wishlist** colaborativa y **estadísticas** de la relación.
 
+📦 **[Descargar APK (Releases)](https://github.com/Snickmax/appmorcito/releases/latest)**
+
 ## Screenshots
 
 | Inicio | Citas (mapa con clustering) | Gastos |
