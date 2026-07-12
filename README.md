@@ -3,6 +3,16 @@
 App de pareja: planificá y registrá **citas** (lugares y visitas con fotos), llevá las **cuentas
 compartidas** (gastos y eventos), una **wishlist** colaborativa y **estadísticas** de la relación.
 
+## Screenshots
+
+| Inicio | Citas (mapa con clustering) | Gastos |
+|:---:|:---:|:---:|
+| ![Inicio](docs/screenshots/home.png) | ![Citas](docs/screenshots/citas.png) | ![Gastos](docs/screenshots/gastos.png) |
+
+| Análisis de gastos | Estadísticas | Memorice |
+|:---:|:---:|:---:|
+| ![Análisis de gastos](docs/screenshots/gastos_analisis.png) | ![Estadísticas](docs/screenshots/estadisticas.png) | ![Memorice](docs/screenshots/memorice.png) |
+
 ## Stack
 
 - **Expo** SDK 54 / **React Native** 0.81 + **TypeScript**
